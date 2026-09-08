@@ -1,3 +1,5 @@
+![Preview](./assets/tcps.png)
+
 # Tim Cope's Pro Skater (TCPS) for Godot 4.8+
 
 Skateboarding for the [3D Player Controller](../3d_player_controller/README.md): a rideable board with the vert physics of Neversoft's Tony Hawk's Underground source and the THPS camera. The board owns the movement, the sounds and the camera; the Player lends its body, its input and its animations through the controller's `Riding` state, which makes the board's camera current and turns the Player's step-up ray off while the board owns the ground. The board touches no Player flags and no Player UI.

@@ -1,4 +1,4 @@
-![Preview](./addons/tcps/assets/tcps.png)
+![Preview](./assets/tcps.png)
 
 # Tim Cope's Pro Skater (TCPS) for Godot 4.8+
 
@@ -20,6 +20,27 @@ Open and run **`res://addons/tcps/scenes/skate_park.tscn`**. The Player starts o
 | `QuarterPipe`, `Funbox` (`CSGPolygon3D`, group `WOOD`) | A lone transition and a kicker with a table top. |
 | `Player` | `player.tscn`, nothing to set. |
 | `Skateboard` | The pickup board (`skateboard.tscn`); `skate_park.gd` equips it through the same path the prompt uses. |
+
+---
+
+## Playing the demo
+
+This repository is private, and GitHub Pages will not serve a private repository on this plan, so there is no
+published demo yet. The `Demo on Pages` workflow is here and ready: make the repository public, or move to a
+plan with private Pages, and it exports on the next push to `main`. The export is never committed either way,
+because this repository is a submodule of the projects that use the addon and a web export is tens of megabytes
+that git cannot compress.
+
+`demo/` is the project that export is built from. It expects the addon at `res://addons/tcps/`, which is
+where a consuming project puts it, so nothing in the addon needs a second set of paths. `demo/addons/` is
+ignored by git; fill it before running the demo locally:
+
+```powershell
+robocopy . demo/addons/tcps /MIR /XD .git .github demo /XF .gitignore .gitattributes
+git clone --depth 1 https://github.com/kirbycope/godot-3d-player-controller-addon.git demo/addons/3d_player_controller
+```
+
+Then open `demo/` in Godot.
 
 ---
 

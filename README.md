@@ -5,7 +5,7 @@
 Skateboarding for the [3D Player Controller](../3d_player_controller/README.md): a rideable board with the vert physics of Neversoft's Tony Hawk's Underground source and the THPS camera. The board owns the movement, the sounds and the camera; the Player lends its body, its input and its animations through the controller's `Riding` state, which makes the board's camera current and turns the Player's step-up ray off while the board owns the ground. The board touches no Player flags and no Player UI.
 
 > [!NOTE]
-> Requires `addons/3d_player_controller` (the `Player`, its `Riding` state, `ActionPrompt` and the skateboarding animation clips in `player.tscn`). `Skateboard` and `SkateboardCamera` register their class names on their own; enabling the plugin only adds the board to the Create New Node dialog.
+> Requires `addons/3d_player_controller` (the `Player`, its `Riding` state and the skateboarding animation clips in `player.tscn`) and, through it, [`addons/controls`](https://github.com/kirbycope/godot-controls), which is where `ActionPrompt` and the on-screen button hints live. `Skateboard` and `SkateboardCamera` register their class names on their own; enabling the plugin only adds the board to the Create New Node dialog.
 
 ---
 
@@ -30,9 +30,12 @@ no published demo. `demo/` is the project one is built from; fill its ignored `a
 Godot:
 
 ```powershell
-robocopy . demo/addons/tcps /MIR /XD .git .github demo /XF .gitignore .gitattributes
-git clone --depth 1 https://github.com/kirbycope/godot-3d-player-controller-addon.git demo/addons/3d_player_controller
+robocopy . demoddons	cps /MIR /XD "$PWD\.git" "$PWD\.github" "$PWD\demo" /XF .gitignore .gitattributes
+git submodule update --init --recursive
 ```
+
+The player controller and the Controls addon are submodules of `demo/addons/`, which is what the second line
+fills in.
 
 ---
 

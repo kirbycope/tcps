@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dxwv0pq5fiqho" path="res://addons/tcps/scripts/skateboard.gd" id="1_c6nw7"]
 [ext_resource type="PackedScene" uid="uid://dqmuukjxtalt4" path="res://addons/tcps/assets/sketchfab/skateboard/scene.gltf" id="1_gnj44"]
-[ext_resource type="PackedScene" uid="uid://dokp6v1sufknx" path="res://addons/3d_player_controller/scenes/action_prompt.tscn" id="3_s43gb"]
+[ext_resource type="PackedScene" uid="uid://dokp6v1sufknx" path="res://addons/controls/action_prompt.tscn" id="3_s43gb"]
 [ext_resource type="AudioStream" uid="uid://cj2f70q1amup3" path="res://addons/tcps/assets/gravitysound/Skateboard SFX/Roll on Cobblestone_1.ogg" id="4_ei60u"]
 [ext_resource type="AudioStream" uid="uid://b4vuc2lkp052o" path="res://addons/tcps/assets/gravitysound/Skateboard SFX/Roll on Cobblestone_2.ogg" id="5_opmnh"]
 [ext_resource type="AudioStream" uid="uid://b30wbm05s8hyh" path="res://addons/tcps/assets/gravitysound/Skateboard SFX/Roll on Cobblestone_3.ogg" id="6_eavof"]

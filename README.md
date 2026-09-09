@@ -30,9 +30,12 @@ no published demo. `demo/` is the project one is built from; fill its ignored `a
 Godot:
 
 ```powershell
-robocopy . demoddons	cps /MIR /XD "$PWD\.git" "$PWD\.github" "$PWD\demo" /XF .gitignore .gitattributes
+robocopy . demo\addons\tcps /MIR /XD "$PWD\.git" "$PWD\.github" "$PWD\demo" "$PWD\.godot" /XF .gitignore .gitattributes
 git submodule update --init --recursive
 ```
+
+The excluded folders are given as full paths on purpose. `robocopy /XD demo` would exclude any folder called
+`demo` at any depth, which includes `scenes/demo/` - the demo scene itself.
 
 The player controller and the Controls addon are submodules of `demo/addons/`, which is what the second line
 fills in.

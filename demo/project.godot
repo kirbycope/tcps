@@ -9,6 +9,7 @@
 config_version=5
 
 [application]
+config/version="3.0.1"
 
 config/name="Tim Cope's Pro Skater"
 run/main_scene="res://addons/tcps/scenes/skate_park.tscn"

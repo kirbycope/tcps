@@ -1,3 +1,5 @@
+![Preview](addons/tcps/assets/tcps.png)
+
 # Tim Cope's Pro Skater (TCPS) for Godot 4.8+
 
 A rideable skateboard with tricks, grinds and its own camera, built on the player controller's riding contract.

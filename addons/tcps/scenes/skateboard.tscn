@@ -51,6 +51,7 @@
 [ext_resource type="AudioStream" uid="uid://mee1jxk0mw73" path="res://addons/tcps/assets/gravitysound/Skateboard SFX/Land_9.ogg" id="49_00cg4"]
 [ext_resource type="AudioStream" uid="uid://bls8s10hvef8u" path="res://addons/tcps/assets/gravitysound/Skateboard SFX/Land_10.ogg" id="50_0pqn3"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/skateboard_camera.gd" id="99_cam"]
+[ext_resource type="SceneReplicationConfig" path="res://addons/tcps/resources/skateboard_replication.tres" id="sync_config"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_senyo"]
 size = Vector3(1.4, 0.4, 0.2)
@@ -160,3 +161,6 @@ script = ExtResource("99_cam")
 [node name="LookReturnTimer" type="Timer" parent="SkateboardCamera"]
 wait_time = 1.0
 one_shot = true
+
+[node name="BodySynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = ExtResource("sync_config")

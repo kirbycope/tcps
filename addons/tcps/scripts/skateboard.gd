@@ -13,6 +13,12 @@ extends Node3D
 ## in that plane while the wall is still behind them, so they go up and come back down onto the same wall.
 ## Holding forward at the lip breaks vert instead and flies over the deck. Left and right spin the skater in the
 ## air, and every landing turns them to face the way they are rolling.
+##
+## Over the network the board is one node in the world on every peer, and its BodySynchronizer carries its position,
+## rotation and [member rider_peer]. Getting on asks the server to put the board under the rider's model on every
+## peer and then hand it to the rider's peer, in that order, so the rider's copy starts sending its place only once
+## everybody has it under their feet; getting off does the same back to the parent it stood under and to the server.
+## A rider who drops out is handed back by every peer on its own.
 
 signal locomotion_requested(state_path: String, immediate: bool) ## Asks the rider to play an animation node.
 signal locomotion_blend_requested(path: String, value: float) ## Asks the rider to set an animation blend value.
@@ -61,8 +67,10 @@ const MODEL_TILT_SPEED: float = 12.0 ## How fast the model leans onto a transiti
 const AIR_TILT_SPEED: float = 2.5 ## How fast the lean eases back upright over flat air; vert air keeps the wall's lean.
 const MIN_AIR_TIME: float = 0.1 ## Shorter hops are contact flicker on a steep transition, not a landing to turn for.
 const DISPLAY_NORMAL_SPEED: float = 14.0 ## Per-second rate the display normal drifts to the floor normal, smoothing a ramp's facets (THUG's adjust_normal).
+const SERVER_PEER: int = 1
 
 var player: Player ## The rider, or the Player looking at the board.
+var rider_peer: int = 0 ## The peer whose Player is on the board, 0 when it is free; replicated, and set on every peer by the hand-off.
 var blocks_hands: bool = false ## Riding a board leaves the hands free (rideable contract).
 var input_type: int = Controls.InputType.KEYBOARD_MOUSE ## Kept equal to the Player's input device by the Riding state.
 var vert_out: Vector3 = Vector3.ZERO ## Horizontal direction over the deck of the wall the skater launched from; ZERO on flat air.
@@ -79,7 +87,6 @@ var _saved_floor_stop_on_slope: bool = true
 var _saved_floor_block_on_wall: bool = true
 var _saved_floor_constant_speed: bool = true
 var _saved_pivot_height: float = 0.0
-var _home_parent: Node
 var _sfx_was_on_floor: bool = false
 var _sfx_was_jumping: bool = false
 var _sfx_was_falling: bool = false
@@ -94,6 +101,11 @@ var _sfx_was_falling: bool = false
 @onready var sfx_ollie: AudioStreamPlayer3D = $SFX_Ollie
 @onready var sfx_land: AudioStreamPlayer3D = $SFX_Land
 @onready var _area_layer: int = area.collision_layer
+@onready var _home: Node = get_parent() ## Where the board stood before anyone got on; where getting off puts it back on every peer.
+
+
+func _ready() -> void:
+	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 
 ## Called by [Camera] while the player looks at the skateboard.
@@ -116,15 +128,16 @@ func equip(_player: Player) -> void:
 	_player.mount(self)
 
 
-## Rideable contract: the Riding state hands the Player over. The board goes under the Player's feet and its
-## camera takes the view.
+## Rideable contract: the Riding state hands the Player over. The board goes under the Player's feet on every peer
+## (once the server says so) and its camera takes the view. A board another peer is riding refuses a second
+## rider: the Player is put back off once the state has finished getting them on.
 func mount(_player: Player) -> void:
+	if rider_peer != 0 and rider_peer != _player.get_multiplayer_authority():
+		_player.dismount.call_deferred(true)
+		return
 	player = _player
 	action_prompt.hide()
-	_home_parent = get_parent()
-	reparent(player.player_model, false)
-	transform = Transform3D.IDENTITY
-	area.collision_layer = 0
+	_hand_to(player.get_multiplayer_authority())
 	_saved_floor_max_angle = player.floor_max_angle
 	_saved_floor_snap_length = player.floor_snap_length
 	_saved_floor_stop_on_slope = player.floor_stop_on_slope
@@ -150,8 +163,12 @@ func mount(_player: Player) -> void:
 	camera.begin(player, self)
 
 
-## Rideable contract: the Player gets off. The board is left where they stand and the view returns to them.
+## Rideable contract: the Player gets off. The board is left where they stand, back under the parent it stood
+## under, the server has it again and the view returns to them. Only the rider gets off it: a refused Player
+## leaving the Riding state must not hand somebody else's board back.
 func dismount(_player: Player) -> void:
+	if rider_peer != 0 and rider_peer != _player.get_multiplayer_authority():
+		return
 	stop_all_roll_sounds()
 	camera.end()
 	player.floor_max_angle = _saved_floor_max_angle
@@ -162,13 +179,67 @@ func dismount(_player: Player) -> void:
 	player.model_pitch_pivot_height = _saved_pivot_height
 	player.model_pitch = 0.0
 	var drop: Transform3D = Transform3D(Basis(player.up_direction, player.orientation.basis.get_euler().y), player.global_position)
-	if is_instance_valid(_home_parent):
-		reparent(_home_parent, false)
-	global_transform = drop
-	area.collision_layer = _area_layer
+	_hand_to(0)
+	global_transform = drop # kept through the reparent home, whenever the server's word for it lands
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
 	player = null
+
+
+# --- Network ------------------------------------------------------------------------------------------------------
+
+## Puts the board under [param peer_id]'s rider on every peer and hands it (and so its synchronizer) to that peer,
+## or, for 0, back where it stood and to the server. The server does both, in that order, so the rider's copy
+## starts sending its place only once every peer has the board under their feet; a client asks the server for it
+## and, when giving it back, goes quiet first. Offline there is nobody to ask.
+func _hand_to(peer_id: int) -> void:
+	var authority: int = peer_id if peer_id != 0 else SERVER_PEER
+	if multiplayer.get_peers().is_empty():
+		_ride_by(peer_id)
+		set_multiplayer_authority(authority)
+	elif multiplayer.is_server():
+		_ride_by.rpc(peer_id)
+		_set_authority.rpc(authority)
+	else:
+		if peer_id == 0:
+			set_multiplayer_authority(SERVER_PEER)
+		_grant.rpc_id(SERVER_PEER, peer_id)
+
+
+## A client's request for the hand-off; the server alone answers it.
+@rpc("any_peer", "reliable")
+func _grant(peer_id: int) -> void:
+	if multiplayer.is_server():
+		_hand_to(peer_id)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _set_authority(peer_id: int) -> void:
+	set_multiplayer_authority(peer_id)
+
+
+## Puts this copy under the feet of [param peer_id]'s Player (the one in this branch of the tree, since a test can
+## run two), or back under [member _home] for 0; runs on every peer so the board shows under the rider everywhere.
+## The pickup area is off while ridden, so nobody is offered a board that is under somebody's feet.
+@rpc("any_peer", "call_local", "reliable")
+func _ride_by(peer_id: int) -> void:
+	rider_peer = peer_id
+	area.collision_layer = _area_layer if peer_id == 0 else 0
+	if peer_id == 0:
+		reparent(_home if is_instance_valid(_home) else get_tree().root)
+		return
+	for node: Node in get_tree().get_nodes_in_group("Player"):
+		if node is Player and node.get_multiplayer_authority() == peer_id and node.multiplayer == multiplayer:
+			reparent((node as Player).player_model, false)
+			transform = Transform3D.IDENTITY
+			return
+
+
+## A rider who drops out takes the board with them; every peer puts it back where it stood and hands it to the server.
+func _on_peer_disconnected(peer_id: int) -> void:
+	if peer_id != 0 and peer_id == rider_peer:
+		_ride_by(0)
+		set_multiplayer_authority(SERVER_PEER)
 
 
 ## Rideable contract: input events while ridden.

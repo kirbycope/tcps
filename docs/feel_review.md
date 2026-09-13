@@ -126,3 +126,10 @@ which tops out at 11.3 m/s, so the crouched push (sprint, THUG's held X) is what
 board leaving the top of a wall now does so by THUG's `Ground_stick_angle` rule rather than by the body
 sliding round the coping onto the deck. The film shows the camera pitching up the transition, going overhead
 in vert air and swinging back behind on landing.
+
+## The trick layer
+
+Flips and grabs in the air named by the direction held, grinds named the same way, manuals, spins counted on
+landing with THUG's 60 degree slop, reverts on a vert landing, and the combo (points times count) banked on a
+clean landing and lost in a bail, all on the board's HUD as THUG shows it. The remaining gaps to THUG are the
+special meter and special tricks, lip tricks, wall rides and wall plants, and the transfers.

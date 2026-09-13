@@ -225,7 +225,7 @@ offset_right = 300.0
 offset_bottom = 110.0
 grow_horizontal = 2
 horizontal_alignment = 1
-text = "Hold Up to push, Down to brake or turn sharp. Hold Ollie and let go to pop. Hold Grind in the air over the ledge, the bench or the handrail and balance with Left/Right. Tap Up then Down for a manual. K steps off."
+text = "Hold Up to push (hold Ollie or Grab to crouch and push harder), Down to brake or turn sharp. Hold Ollie and let go to pop; Flip or Grab in the air with a direction for the trick, Left/Right to spin. Hold Grind over the ledge, the bench or the handrail and balance with Left/Right. Tap Up then Down for a manual. Land clean to bank the combo; Revert on a vert landing to keep it. K steps off."
 autowrap_mode = 3
 
 [connection signal="timeout" from="MountTimer" to="." method="_on_mount_timer_timeout"]

@@ -40,20 +40,20 @@ class Driver extends Node:
 		{"to": Vector3(-8, 0, 4), "kind": "point"}, # line up on the quarter pipe (a CSGPolygon3D extrudes toward -z, so it spans z 0 to 8)
 		{"to": Vector3(-22, 0, 4), "kind": "air"}, # up the quarter pipe and back down
 		{"to": Vector3(-8, 0, 4), "kind": "point"}, # roll away from it
-		{"to": Vector3(-22, 0, 4), "kind": "air", "spin": -1.0}, # again, spinning in the air
+		{"to": Vector3(-22, 0, 4), "kind": "air", "spin": -1.0, "grab": true}, # again, spinning with a grab in the air
 		{"to": Vector3(-12, 0, 15.7), "kind": "point"}, # line up west of the ledge
 		{"to": Vector3(8, 0, 15.7), "kind": "air", "ollie_at_x": -4.6, "grind": true}, # ollie onto its front rail and grind it out
 		{"to": Vector3(10, 0, 19), "kind": "point"},
 		{"to": Vector3(-16, 0, 20), "kind": "point"}, # line up on the handrail
 		{"to": Vector3(0, 0, 20), "kind": "air", "ollie_at_x": -13.6, "grind": true}, # up onto the handrail
 		{"to": Vector3(2, 0, 6), "kind": "point", "manual_at_x": -6.0}, # a manual across the flat
-		{"to": Vector3(17, 0, 6), "kind": "point", "ollie_at_x": 9.5}, # over the funbox
+		{"to": Vector3(17, 0, 6), "kind": "point", "ollie_at_x": 9.5, "flip": true}, # a kickflip over the funbox
 		{"to": Vector3(20, 0, 25), "kind": "point"},
 		{"to": Vector3(28, 0, 25), "kind": "point"}, # into the wall, head on
 		{"to": Vector3(0, 0, -10), "kind": "point"}, # into the half pipe's flat
 		{"to": Vector3(-9, 0, -10), "kind": "air"}, # left wall
 		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true}, # right wall, pop at the lip
-		{"to": Vector3(0, 0, 0), "kind": "point"},
+		{"to": Vector3(0, 0, 0), "kind": "point", "ollie_at_x": -2.0, "spin": 1.0}, # a flat ollie with a 180 on the way out
 	]
 	const REACH: float = 1.5
 
@@ -66,6 +66,7 @@ class Driver extends Node:
 	var _left_ground: bool = false
 	var _ollied: bool = false
 	var _manualled: bool = false
+	var _tricked: bool = false
 	var _leg_time: float = 0.0
 
 	func _physics_process(delta: float) -> void:
@@ -120,7 +121,11 @@ class Driver extends Node:
 		else:
 			Input.action_release(&"move_down")
 		if in_air and spec.has("spin"):
-			_press_turn(spec["spin"])
+			var b: Skateboard = _player.riding as Skateboard
+			if absf(b._spin_tally) < 150.0:
+				_press_turn(spec["spin"]) # up to a half turn and a bit, inside the slop of the 180
+			else:
+				_release_turn()
 		elif absf(angle) > 0.08 and not in_air:
 			_press_turn(signf(angle))
 		else:
@@ -134,6 +139,17 @@ class Driver extends Node:
 				Input.action_press(&"action")
 		if spec.get("grind", false) and _ollied and landed:
 			Input.action_release(&"action")
+		# Tricks in the air: a flip a moment after the pop, a grab held through the air
+		if spec.get("flip", false) and _ollied and in_air and not _tricked and _leg_time > 0.0:
+			_tricked = true
+			_send(&"attack", true)
+			get_tree().create_timer(0.1, false, true).timeout.connect(_send.bind(&"attack", false))
+		if spec.get("grab", false) and in_air and not _tricked and _left_ground:
+			_tricked = true
+			Input.action_press(&"sprint")
+			_send(&"sprint", true)
+		if spec.get("grab", false) and _tricked and landed:
+			Input.action_release(&"sprint")
 		# A manual: Up then Down, tapped as events the way the board reads them
 		if spec.has("manual_at_x") and not _manualled and on_floor and absf(here.x - float(spec["manual_at_x"])) < 0.6:
 			_manualled = true
@@ -177,6 +193,7 @@ class Driver extends Node:
 		_left_ground = false
 		_ollied = false
 		_manualled = false
+		_tricked = false
 		_release_turn()
 		Input.action_release(&"action")
 

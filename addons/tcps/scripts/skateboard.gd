@@ -12,7 +12,9 @@ extends Node3D
 ## speed loss that grows with the angle. The ollie is charged: its height is linear in how long the button was held.
 ## Leaving a wall steeper than [constant VERT_ANGLE] is a vert launch, held in the wall's plane through the air.
 ## In the air with Grind held the board looks for a [Rail] each tick, snaps to the nearest one it is travelling
-## along, and rides it under a [SkateBalance]; the same balance runs a manual on the ground.
+## along, and rides it under a [SkateBalance]; the same balance runs a manual on the ground. Flip and grab tricks
+## in the air, the spin counted on landing, reverts, grinds and manuals all go into a [SkateTricks] combo, banked
+## on a clean landing and lost in a bail, and shown on the board's HUD.
 ##
 ## Over the network the board is one node in the world on every peer, and its BodySynchronizer carries its position,
 ## rotation and [member rider_peer]. Getting on asks the server to put the board under the rider's model on every
@@ -25,6 +27,8 @@ signal locomotion_blend_requested(path: String, value: float) ## Asks the rider 
 signal jump_requested ## Asks the rider to run its jump animation (the pop itself is applied here).
 signal trick_started(kind: String) ## A manual or a grind began ("manual", "nose_manual", "grind").
 signal trick_ended(kind: String, bailed: bool) ## It ended, and whether the needle went off the meter.
+signal combo_banked(points: int) ## A clean landing put the combo into the score.
+signal combo_lost ## A bail threw the combo away.
 
 enum State { GROUND, AIR, RAIL }
 
@@ -33,6 +37,9 @@ enum State { GROUND, AIR, RAIL }
 @export var keyboard_dismount_action: StringName = &"whistle"
 @export var keyboard_jump_action: StringName = &"jump"
 @export var keyboard_grind_action: StringName = &"action"
+@export var keyboard_flip_action: StringName = &"attack"
+@export var keyboard_grab_action: StringName = &"sprint" ## On the ground the same button is the crouched push.
+@export var keyboard_revert_actions: Array[StringName] = [&"focus", &"shoot"] ## THUG's L2 and R2 on a vert landing.
 @export var keyboard_sprint_action: StringName = &"sprint"
 @export var keyboard_kick_push_action: StringName = &"move_up"
 
@@ -40,6 +47,9 @@ enum State { GROUND, AIR, RAIL }
 @export var pad_dismount_action: StringName = &"whistle"
 @export var pad_jump_action: StringName = &"jump"
 @export var pad_grind_action: StringName = &"action"
+@export var pad_flip_action: StringName = &"attack"
+@export var pad_grab_action: StringName = &"sprint"
+@export var pad_revert_actions: Array[StringName] = [&"focus", &"shoot"]
 @export var pad_sprint_action: StringName = &"sprint"
 @export var pad_kick_push_action: StringName = &"move_up"
 
@@ -92,6 +102,8 @@ const MANUAL_TAP_WINDOW: float = 0.25 ## The two taps of a manual (Up then Down,
 const MANUAL_MIN_SPEED: float = 1.0 ## A manual slower than this falls over.
 const BAIL_TIME: float = 0.8 ## Seconds the rider is a passenger after a bail.
 const BAIL_SPEED_SCALE: float = 0.25 ## What a bail leaves of the speed.
+const REVERT_WINDOW: float = 0.3 ## Seconds after a vert landing in which a revert button keeps the combo.
+const BANK_GRACE: float = 0.25 ## Seconds after a landing in which a manual, a grind or a revert carries the combo on before it is banked.
 const RAMP_FLOOR_MAX_ANGLE: float = deg_to_rad(88.0) ## Transitions stay "floor" almost to vertical, so the board rides them instead of hitting a wall.
 const RAMP_FLOOR_SNAP_LENGTH: float = 1.0 ## Keeps the board glued to a curving transition at speed.
 const VERT_ANGLE: float = deg_to_rad(50.0) ## Leaving a floor steeper than this is a vert launch.
@@ -118,6 +130,13 @@ var rail_sign: float = 1.0 ## 1 travelling from the rail's start to its end, -1 
 var rail_speed: float = 0.0 ## Metres per second along the rail, always positive; [member rail_sign] says which way.
 var balance: SkateBalance ## The meter while a manual or a grind is on; null otherwise.
 var trick: String = "" ## "manual", "nose_manual" or "grind" while [member balance] runs.
+var tricks: SkateTricks = SkateTricks.new() ## The combo and the score.
+var air_trick: String = "" ## The flip or grab in progress in the air, or "".
+var _air_trick_kind: String = "" ## "flip" or "grab".
+var _air_trick_time: float = 0.0 ## Seconds the air trick has run.
+var _spin_tally: float = 0.0 ## Degrees of yaw turned in this air.
+var _landed_from_vert_at: float = -1.0 ## When the last vert landing was, for the revert window; -1 when none.
+var _bank_timer: float = 0.0 ## Counting down since a landing with a combo waiting to be banked.
 var vert_out: Vector3 = Vector3.ZERO ## Horizontal direction over the deck of the wall the skater launched from; ZERO on flat air.
 var vert_normal: Vector3 = Vector3.ZERO ## Horizontal normal of that wall, into the pipe; the skater is held in its vertical plane through vert air.
 var display_normal: Vector3 = Vector3.UP ## The floor normal smoothed over time, for the lean and the camera, so facet edges do not step them.
@@ -149,6 +168,9 @@ var _sfx_was_falling: bool = false
 @onready var ground_ray: RayCast3D = $GroundRay ## What the board rolls on, for the roll sounds.
 @onready var area: Area3D = $Area3D
 @onready var balance_meter: BalanceMeter = $HUD/BalanceMeter
+@onready var trick_line: Label = $HUD/TrickLine ## The combo so far.
+@onready var trick_total: Label = $HUD/TrickTotal ## What it is worth.
+@onready var score_label: Label = $HUD/Score ## The score banked.
 @onready var sfx_roll_on_cobblestone: AudioStreamPlayer3D = $SFX_Roll_on_Cobblestone
 @onready var sfx_roll_on_concrete: AudioStreamPlayer3D = $SFX_Roll_on_Concrete
 @onready var sfx_roll_on_wood: AudioStreamPlayer3D = $SFX_Roll_on_Wood
@@ -218,6 +240,11 @@ func mount(_player: Player) -> void:
 	_tense_since = -1.0
 	_bail_timer = 0.0
 	_end_trick(false)
+	tricks = SkateTricks.new()
+	air_trick = ""
+	_spin_tally = 0.0
+	_landed_from_vert_at = -1.0
+	_bank_timer = 0.0
 	locomotion_requested.emit(LOCOMOTION, false)
 	camera.begin(player, self)
 
@@ -330,6 +357,23 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 			jump_requested.emit()
 			_ollie(held)
 
+	# Flip and grab tricks in the air, named by the direction held (THUG's Square and Circle)
+	if state == State.AIR and air_trick == "":
+		var direction: String = SkateTricks.direction_of(_digital(player.player_input.motion))
+		if event.is_action_pressed(_action(keyboard_flip_action, pad_flip_action)):
+			_start_air_trick("flip", SkateTricks.named(SkateTricks.FLIPS, direction))
+		elif event.is_action_pressed(_action(keyboard_grab_action, pad_grab_action)):
+			_start_air_trick("grab", SkateTricks.named(SkateTricks.GRABS, direction))
+
+	# A revert on a vert landing (THUG's L2 and R2): the combo lives on into a manual
+	var reverts: Array[StringName] = keyboard_revert_actions if input_type == Controls.InputType.KEYBOARD_MOUSE else pad_revert_actions
+	for revert: StringName in reverts:
+		if event.is_action_pressed(revert) and _landed_from_vert_at >= 0.0 and _now() - _landed_from_vert_at <= REVERT_WINDOW:
+			_landed_from_vert_at = -1.0
+			tricks.add("Revert", SkateTricks.REVERT_POINTS)
+			_bank_timer = BANK_GRACE
+			_refresh_hud()
+
 	# Kick push from (near) standstill
 	if event.is_action_pressed(_action(keyboard_kick_push_action, pad_kick_push_action)) \
 	and not is_kick_pushing \
@@ -384,7 +428,9 @@ func ride(_player: Player, delta: float) -> void:
 	_ollie_grace = maxf(_ollie_grace - delta, 0.0)
 	_bail_timer = maxf(_bail_timer - delta, 0.0)
 	var motion: Vector2 = _digital(player.player_input.motion) if _bail_timer <= 0.0 else Vector2.ZERO
-	var sprint: bool = Input.is_action_pressed(_action(keyboard_sprint_action, pad_sprint_action)) and not player.is_exhausted and motion.y > 0.0
+	# THUG crouches for the faster push while the ollie button is held; sprint does the same here
+	var sprint: bool = (Input.is_action_pressed(_action(keyboard_sprint_action, pad_sprint_action)) or _tense_since >= 0.0) and not player.is_exhausted and motion.y > 0.0
+	_tick_tricks(delta)
 	var grind_held: bool = Input.is_action_pressed(_action(keyboard_grind_action, pad_grind_action)) and _bail_timer <= 0.0
 
 	if state == State.RAIL:
@@ -439,6 +485,7 @@ func ride(_player: Player, delta: float) -> void:
 		balance_meter.visible = balance != null and player.is_multiplayer_authority()
 		if balance:
 			balance_meter.lean = balance.lean
+	_refresh_hud()
 	_old_position = player.global_position
 	_update_sounds()
 	camera.follow(delta)
@@ -571,7 +618,9 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 		_air_spin_hold += delta
 		var ramp: float = clampf((_air_spin_hold - AIR_NO_ROTATE_TIME) / (AIR_RAMP_ROTATE_TIME - AIR_NO_ROTATE_TIME), 0.0, 1.0)
 		if ramp > 0.0:
-			player.orientation.basis = Basis(up, -motion.x * AIR_SPIN_SPEED * ramp * delta) * player.orientation.basis
+			var turn: float = -motion.x * AIR_SPIN_SPEED * ramp * delta
+			player.orientation.basis = Basis(up, turn) * player.orientation.basis
+			_spin_tally += rad_to_deg(turn)
 	else:
 		_air_spin_hold = 0.0
 	var gravity: Vector3 = -up * AIR_GRAVITY
@@ -600,6 +649,8 @@ func _wall_still_behind() -> bool:
 ## over the deck and it is regular air.
 func _launch(up: Vector3) -> void:
 	_air_spin_hold = 0.0
+	_spin_tally = 0.0
+	_landed_from_vert_at = -1.0
 	if balance and trick != "grind":
 		_end_trick(false)
 	if vert_normal != Vector3.ZERO:
@@ -626,9 +677,11 @@ func _launch(up: Vector3) -> void:
 func _land(normal: Vector3) -> void:
 	if _air_time < MIN_AIR_TIME:
 		return # contact flicker on a steep transition; the vert air, if any, carries on
+	var from_vert: bool = vert_normal != Vector3.ZERO
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
 	_air_spin_hold = 0.0
+	_settle_landing(from_vert)
 	var rolling: Vector3 = player.velocity.slide(normal)
 	if rolling.length() > 1.0:
 		var reversed: bool = player.orientation.basis.z.slide(player.up_direction).dot(rolling.slide(player.up_direction)) < 0.0
@@ -698,6 +751,9 @@ func _got_rail(on: Rail, hit: Dictionary) -> void:
 	player.model_pitch = 0.0
 	player.rotate_model_to_direction(direction * rail_sign)
 	_start_trick("grind")
+	var grind: Array = SkateTricks.named(SkateTricks.GRINDS, SkateTricks.direction_of(_digital(player.player_input.motion)))
+	tricks.add(grind[0], grind[1])
+	_bank_timer = 0.0
 
 
 ## Riding the rail: THUG do_rail_physics. Gravity along the rail speeds a descent and slows a climb (and turns the
@@ -752,6 +808,10 @@ func _start_trick(kind: String) -> void:
 	balance = SkateBalance.new()
 	balance.setup(kind == "grind")
 	trick = kind
+	if SkateTricks.MANUALS.has(kind):
+		var manual: Array = SkateTricks.MANUALS[kind]
+		tricks.add(manual[0], manual[1])
+		_bank_timer = 0.0
 	trick_started.emit(kind)
 
 
@@ -768,9 +828,73 @@ func _end_trick(bailed: bool) -> void:
 ## [constant BAIL_TIME] (THUG's bail is an animation over the same physics; there is no ragdoll here yet).
 func _bail() -> void:
 	_end_trick(true)
+	air_trick = ""
+	tricks.bail()
+	combo_lost.emit()
 	player.velocity = player.velocity.slide(player.up_direction) * BAIL_SPEED_SCALE + player.up_direction * minf(player.velocity.dot(player.up_direction), 0.0)
 	_bail_timer = BAIL_TIME
 	_tense_since = -1.0
+
+
+# --- Tricks and the score -----------------------------------------------------------------------------------------
+
+## Starts a flip or a grab in the air: [param named] is [name, points] from the trick tables.
+func _start_air_trick(kind: String, named: Array) -> void:
+	air_trick = named[0]
+	_air_trick_kind = kind
+	_air_trick_time = 0.0
+	tricks.add(named[0], named[1])
+	_bank_timer = 0.0
+
+
+## Runs the timers behind the combo each tick: the air trick's time, the points a hold earns, and the grace after a
+## landing at whose end the combo is banked.
+func _tick_tricks(delta: float) -> void:
+	if air_trick != "":
+		_air_trick_time += delta
+		if _air_trick_kind == "grab":
+			var grab: StringName = _action(keyboard_grab_action, pad_grab_action)
+			if Input.is_action_pressed(grab):
+				tricks.hold(delta)
+			elif _air_trick_time >= SkateTricks.GRAB_MIN_TIME:
+				air_trick = "" # let go: the grab is done and a landing is clean
+	if balance != null:
+		tricks.hold(delta)
+	if _bank_timer > 0.0:
+		_bank_timer -= delta
+		if _bank_timer <= 0.0 and balance == null and state == State.GROUND and not tricks.combo.is_empty():
+			combo_banked.emit(tricks.land_clean())
+
+
+## A landing: a flip still turning is a bail, a spin far from a half turn is a bail, otherwise the spin is counted,
+## a vert landing opens the revert window, and the combo waits [constant BANK_GRACE] for a manual or a revert
+## before it is banked. THUG's physics never refuses a landing; this is its Landed script's decision.
+func _settle_landing(from_vert: bool) -> void:
+	var sloppy_spin: bool = SkateTricks.spin_is_sloppy(_spin_tally)
+	var mid_flip: bool = air_trick != "" and _air_trick_kind == "flip" and _air_trick_time < SkateTricks.FLIP_TIME
+	if mid_flip or sloppy_spin:
+		air_trick = ""
+		_bail()
+		return
+	air_trick = ""
+	tricks.add_spin(_spin_tally)
+	_spin_tally = 0.0
+	_landed_from_vert_at = _now() if from_vert else -1.0
+	if not tricks.combo.is_empty():
+		_bank_timer = BANK_GRACE
+
+
+## Puts the combo, its worth and the score on the board's HUD for the rider.
+func _refresh_hud() -> void:
+	if trick_line == null:
+		return
+	var mine: bool = player != null and player.is_multiplayer_authority()
+	trick_line.visible = mine and not tricks.combo.is_empty()
+	trick_total.visible = trick_line.visible
+	score_label.visible = mine
+	trick_line.text = tricks.combo_text()
+	trick_total.text = tricks.total_text()
+	score_label.text = "SCORE %s" % SkateTricks._with_commas(tricks.score)
 
 
 # --- Model --------------------------------------------------------------------------------------------------------
@@ -839,7 +963,10 @@ func get_contextual_controls(input_type_: int) -> Dictionary:
 		"right_joystick": "Camera",
 		"joypad_button_3": "Ollie",
 		"joypad_button_0": "Grind",
-		"joypad_button_1": "Fast Push",
+		"joypad_button_2": "Flip",
+		"joypad_button_1": "Grab / Push",
+		"joypad_axis_4_plus": "Revert",
+		"joypad_axis_5_plus": "Revert",
 		"key_k" if input_type_ == Controls.InputType.KEYBOARD_MOUSE else "joypad_button_12": "Dismount",
 	}
 

@@ -37,10 +37,10 @@ class Driver extends Node:
 	## landed again (a wall ridden up and back down); "point" legs end within reach of the target. "ollie" legs
 	## pop once on the way; "spin" legs hold a direction in the air.
 	const LEGS: Array[Dictionary] = [
-		{"to": Vector3(-8, 0, 12), "kind": "point"}, # line up on the quarter pipe (it spans z 8 to 16)
-		{"to": Vector3(-22, 0, 12), "kind": "air"}, # up the quarter pipe and back down
-		{"to": Vector3(-8, 0, 12), "kind": "point"}, # roll away from it
-		{"to": Vector3(-22, 0, 12), "kind": "air", "spin": -1.0}, # again, spinning in the air
+		{"to": Vector3(-8, 0, 4), "kind": "point"}, # line up on the quarter pipe (a CSGPolygon3D extrudes toward -z, so it spans z 0 to 8)
+		{"to": Vector3(-22, 0, 4), "kind": "air"}, # up the quarter pipe and back down
+		{"to": Vector3(-8, 0, 4), "kind": "point"}, # roll away from it
+		{"to": Vector3(-22, 0, 4), "kind": "air", "spin": -1.0}, # again, spinning in the air
 		{"to": Vector3(-12, 0, 15.7), "kind": "point"}, # line up west of the ledge
 		{"to": Vector3(8, 0, 15.7), "kind": "air", "ollie_at_x": -4.6, "grind": true}, # ollie onto its front rail and grind it out
 		{"to": Vector3(10, 0, 19), "kind": "point"},
@@ -100,11 +100,25 @@ class Driver extends Node:
 			_next_leg()
 			return
 
-		# Steer: press left or right until the heading lines up with the way to the target
-		Input.action_press(&"move_up")
+		# Steer: press left or right until the heading lines up with the way to the target, with Down for THUG's
+		# sharp turn when the target is well off the nose; push crouched (sprint), as a THUG player holds X, or a
+		# standing push never reaches the top of a 3.3 m wall; and let go of everything on a transition and in
+		# the air, since Up at the moment of leaving the wall is THUG's break vert, over the deck
 		var heading: Vector3 = _player.orientation.basis.z.slide(Vector3.UP).normalized()
 		var angle: float = heading.signed_angle_to(flat.normalized(), Vector3.UP)
 		var in_air: bool = not on_floor
+		var on_transition: bool = on_floor and _player.get_floor_normal().y < 0.7
+		var sharp: bool = on_floor and not on_transition and absf(angle) > deg_to_rad(45.0)
+		if on_transition or in_air or sharp:
+			Input.action_release(&"move_up")
+			Input.action_release(&"sprint")
+		else:
+			Input.action_press(&"move_up")
+			Input.action_press(&"sprint")
+		if sharp:
+			Input.action_press(&"move_down")
+		else:
+			Input.action_release(&"move_down")
 		if in_air and spec.has("spin"):
 			_press_turn(spec["spin"])
 		elif absf(angle) > 0.08 and not in_air:
@@ -167,5 +181,5 @@ class Driver extends Node:
 		Input.action_release(&"action")
 
 	func _release_all() -> void:
-		for action: StringName in [&"move_up", &"move_left", &"move_right", &"jump", &"sprint", &"action"]:
+		for action: StringName in [&"move_up", &"move_down", &"move_left", &"move_right", &"jump", &"sprint", &"action"]:
 			Input.action_release(action)

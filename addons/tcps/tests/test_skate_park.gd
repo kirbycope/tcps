@@ -47,8 +47,9 @@ func _ride_the_left_wall(ollie: bool, hold_forward: bool = false) -> Dictionary:
 	await wait_seconds(0.6)
 	assert_true(player.is_riding, "The MountTimer put the Player on the board")
 	var state: Skateboard = player.riding as Skateboard
-	player.warp_to(Transform3D(Basis(), Vector3(1.0, 0.1, -10.0)))
+	player.warp_to(Transform3D(Basis(), Vector3(3.0, 0.1, -10.0)))
 	player.rotate_model_to_direction(Vector3.LEFT)
+	Input.action_press(&"sprint") # THUG's crouched push: a standing push tops out below what a 3.3 m wall needs
 	await wait_physics_frames(3)
 	var ride: Dictionary = {"top": 0.0, "launched": false, "launch_x": 0.0, "shallowest_air_lean": PI, "ollied": false, "max_plane_drift": 0.0, "camera_above_skater_at_peak": false}
 	var launch_pos: Vector3 = Vector3.ZERO
@@ -77,6 +78,7 @@ func _ride_the_left_wall(ollie: bool, hold_forward: bool = false) -> Dictionary:
 			ride.max_plane_drift = maxf(ride.max_plane_drift, absf((player.global_position - launch_pos).dot(state.vert_normal)))
 			if absf(player.velocity.y) < 0.5 and state.camera.global_position.y > player.global_position.y + 1.0:
 				ride.camera_above_skater_at_peak = true
+	Input.action_release(&"sprint")
 	ride.player = player
 	return ride
 

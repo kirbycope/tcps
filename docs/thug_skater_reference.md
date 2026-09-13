@@ -1,10 +1,55 @@
 # How THUG's skater moves: an engineering description from the source
 
 Read from the Tony Hawk's Underground (2003, Neversoft) source at `thug1src/thug` on GitHub, which holds
-only `Code/`. **`physics.q`, the script file holding nearly every tunable, is not in the tree.** Wherever
-a value lives there, the symbol is named exactly as the C++ reads it (`GetPhysicsFloat(CRCD(..., "Name"))`)
-and marked "physics.q". Hard-coded numbers are quoted with file and line. Line numbers refer to
-`Code/Sk/Components/SkaterCorePhysicsComponent.cpp` unless another file is named.
+only `Code/`. `physics.q`, the script file holding nearly every tunable, is not in that tree, but the
+decompiled game scripts are on GitHub at `atljp/thps-modding-resources` under
+`Scripts/THUG/THUG_qb.pre_(decompiled_roq)/game/skater/physics.txt`, and the values the board uses are listed
+in the section "The physics.q values" below. Wherever a value lives there, the symbol is named exactly as the
+C++ reads it (`GetPhysicsFloat(CRCD(..., "Name"))`). Hard-coded numbers are quoted with file and line. Line
+numbers refer to `Code/Sk/Components/SkaterCorePhysicsComponent.cpp` unless another file is named.
+
+## The physics.q values
+
+Inches, inches per second, radians per second and milliseconds, as the C++ reads them. A `stat` range is
+`(stat 0, stat 10)`; the board takes the middle. Gravity is negative in the file (down).
+
+| Symbol | Value |
+|---|---|
+| `Physics_Ground_Rotation` / `Physics_Ground_Sharp_Rotation` | 1.8 / 3.6 rad/s |
+| `Physics_Standing_Acceleration_Stat` / `Physics_Crouching_Acceleration_stat` | 629..700 / 1057..1200 in/s^2 |
+| `Skater_Max_Standing_Kick_Speed_Stat` / `Skater_Max_Crouched_Kick_Speed_Stat` | 394..496 / 532..675 in/s |
+| `Skater_Max_Speed_Stat` / `Skater_Max_Max_Speed_Stat` | 757..900 / 957..1100 in/s |
+| `Physics_Standing_Air_Friction` / `Physics_Crouched_Air_Friction` / `Physics_Heavy_Air_Friction` | 0.00001 / 0.000002 / 0.0001 |
+| `Physics_Rolling_Friction` | 0.00001 |
+| `Physics_Brake_Acceleration` | 900 in/s^2 |
+| `Physics_Ground_Gravity` / `Physics_Air_Gravity` / `Physics_Rail_Gravity` / `Wall_Ride_Gravity` | 1000 / 1350 / 2000 / 969 in/s^2 |
+| `Physics_Air_hang_Stat` / `Physics_Vert_hang_Stat` | 1.0 / 1.1 |
+| `Physics_Jump_Speed_min_Stat` / `Physics_Jump_Speed_Stat` | 350 / 414..450 in/s |
+| `Physics_Air_Jump_Speed_min_Stat` / `Physics_Air_Jump_Speed_Stat` | 100 / 275 in/s |
+| `Physics_Boneless_Jump_Speed_min_Stat` / `Physics_Boneless_Jump_Speed_Stat` | 400 / 489..525 in/s |
+| `Skater_max_tense_time` | 200 ms |
+| `Physics_Air_Rotation_stat` / `Physics_air_tap_turn_speed_stat` | 6.85..7.75 rad/s |
+| `Physics_Air_No_Rotate_Time` / `Physics_Air_Ramp_Rotate_Time` | 100 / 50 ms |
+| `Physics_Air_Lean_stat`, `Physics_Air_No_Lean_Time`, `Physics_Air_Ramp_Lean_Time` | 1.0 rad/s, 200 ms, 200 ms |
+| `Skater_autoturn_speed` / `skater_autoturn_cancel_time` / `skater_autoturn_vert_angle` | 3.0 rad/s / 300 ms / 5 deg |
+| `Ground_stick_angle` / `Ground_stick_angle_forward` | 30 / 60 deg |
+| `Physics_Ground_Snap_Up` / `Physics_Ground_Snap_Down` / `Physics_Air_Snap_Up` | 13 / 8.2 / 15 in |
+| `Normal_Lerp_Speed` | 0.1 per frame |
+| `Skater_Flip_Speed` | 1 in/s |
+| `Skater_Vert_Allow_break_Time` / `Skater_vert_push_time` / `Skater_vert_active_up_time` | 200 / 130 / 250 ms |
+| `physics_break_air_speed_scale` / `physics_break_air_up_scale` / `Skater_Break_Vert_forward_tilt` | 0.75 / 0.75 / 45 deg |
+| `Physics_Vert_Push_Out` | 3 in |
+| `Rail_Max_Snap` / `Rail_Speed_Boost` / `Point_Rail_Speed_Boost` | 40 in / 150 / 100 in/s |
+| `Rail_Corner_Leave_Angle` / `Rail_Jump_Angle` / `Rail_Tolerance` | 50 deg / 15 deg / 0.7 |
+| `Rail_minimum_rerail_time` / `Rail_jump_rerail_time` / `Rail_walk_rerail_time` | 500 / 300 / 1000 ms |
+| `Wall_Bounce_Angle_Multiplier` / `Wall_Bounce_Dont_Slow_Angle` / `Wall_Non_Skatable_Angle` | 1.1 / 30 deg / 25 deg |
+| `Wall_Ride_Min_Speed`, `_Max_Incident_Angle`, `_Max_Tilt`, `_Turn_Speed`, `_Jump_Out_Speed`, `_Jump_Up_Speed` | 75 in/s, 60 deg, 68.5 deg, 0.004 rad/frame, 40, 80 in/s |
+| `Physics_Wallplant_*` | approach 20 deg, speed loss 225, min exit 200, vertical exit 500 in/s, min height 24 in, distance 27.6 in, duration 160 ms |
+| `ManualParams` | `Lean_Gravity_Stat` 0.02, `Instable_Rate` 0.099..0.07, `Instable_Base` 1, `Lean_Min_Speed` 5, `Lean_Rnd_Speed` 20, `Lean_Acc` 10 (x 0.75..1.0 by difficulty), `Lean_Bail_Angle` 4000, `Cheese` 700 over 100 frames, `Repeat_Multiplier` 0.25, `Lean_Repeat_Multiplier` 0.8; lean in 4096ths, rates per frame |
+| `GrindParams` | as the manual but `Instable_Rate` 0.104..0.09, `Lean_Rnd_Speed` 7.07..6, `Cheese` 2500 over 30 frames, `Repeat_Multiplier` 0.31..0.1, `Same_Grind_Add_Time` 2 s, `New_Grind_Sub_Time` -0.286..0 |
+| `LipParams` | `Instable_Rate` 0.5..0.2, `Lean_Min_Speed` 10, `Lean_Rnd_Speed` 20, `Cheese` 3000..1000 over 180 frames |
+| `BalanceSafeButtonPeriod` / `BalanceIgnoreButtonPeriod` | 1000 / 0 ms |
+| `Skater_Camera_Standard_Medium` | `horiz_fov` 72, `behind` 12 ft, `above` 4.3 ft, `tilt` 0.18, `slerp` 0.04, `vert_air_slerp` 0.04, `vert_air_landed_slerp` 0.375, `lerp_xz` 0.25, `lerp_y` 0.75, vert lerps 1.0, `zoom_lerp` 0.0625, `big_air_trick_zoom` 0.7, `grind_zoom` 1.0, `lip_trick_tilt` -0.8, `lip_trick_above` 0.4, `origin_offset` 0.2. Near: behind 7, above 2, slerp 0.08, vert 0.025. Far: behind 14, above 6, tilt 0.3, slerp 0.08 |
 
 Conventions:
 

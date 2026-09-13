@@ -166,23 +166,30 @@ func _turn(_delta: float) -> void:
 	if _samples.is_empty():
 		_yaw_start = _yaw()
 		_samples.append(_speed())
+		_samples.append(0.0) # the yaw turned so far, summed a frame at a time so a turn past a half circle still counts
 	Input.action_press(&"move_left")
+	_samples[1] = float(_samples[1]) + absf(wrapf(_yaw() - _yaw_start, -PI, PI))
+	_yaw_start = _yaw()
 	if _t >= 2.5:
-		var turned: float = wrapf(_yaw() - _yaw_start, -PI, PI)
-		_results["turn"] = {"degrees_per_second_at_speed": snappedf(rad_to_deg(absf(turned)) / 2.0, 0.1), "speed_before": snappedf(float(_samples[0]), 0.01), "speed_after": snappedf(_speed(), 0.01)}
+		_results["turn"] = {"degrees_per_second_at_speed": snappedf(rad_to_deg(float(_samples[1])) / 2.0, 0.1), "speed_before": snappedf(float(_samples[0]), 0.01), "speed_after": snappedf(_speed(), 0.01)}
 		_next()
 
 
-## Ride at the quarter pipe (its face at x = -15, run-up from the east) at full push and time the air.
+## Ride at the quarter pipe (its face at x = -15, spanning z 0 to 8, run-up from the east) at full push and time the air.
 func _vert(delta: float) -> void:
-	if _place(Vector3(-6.0, 0.1, 8.0), Vector3(-1.0, 0.0, 0.0), 8.0):
+	if _place(Vector3(-6.0, 0.1, 4.0), Vector3(-1.0, 0.0, 0.0), 14.0): # the quarter pipe is extruded toward -z from z = 8, so its middle is z = 4
 		_speed_at_launch = 0.0
 		return
-	Input.action_press(&"move_up")
 	var on_floor: bool = _player.is_on_floor()
+	if on_floor and _player.get_floor_normal().y < 0.7:
+		Input.action_release(&"move_up") # let go on the transition: holding Up at the lip breaks vert over the deck
+		Input.action_release(&"sprint")
+	elif on_floor:
+		Input.action_press(&"move_up")
+		Input.action_press(&"sprint") # crouched, the way a THUG player pushes at a wall
 	if on_floor:
 		if not _was_on_floor and _air_t > 0.1:
-			_results["vert"] = {"air_time": snappedf(_air_t, 0.01), "peak_height": snappedf(_peak, 0.01), "speed_into_wall": snappedf(_speed_at_launch, 0.01), "speed_after_landing": snappedf(_speed(), 0.01)}
+			_results["vert"] = {"air_time": snappedf(_air_t, 0.01), "peak_height": snappedf(_peak, 0.01), "speed_into_wall": snappedf(_speed_at_launch, 0.01), "speed_after_landing": snappedf(_player.velocity.length(), 0.01)}
 			_next()
 			return
 		if _player.global_position.y < 0.5:
@@ -200,8 +207,8 @@ func _vert(delta: float) -> void:
 ## runs, nobody balancing) and the speed on and off the rail.
 func _grind(delta: float) -> void:
 	var board: Skateboard = _player.riding as Skateboard
-	if _place(Vector3(-3.6, 0.6, 15.7), ALONG, 6.0):
-		_player.velocity.y = 1.0 # rising, so the ground snap does not pull the rider down before the rail
+	if _place(Vector3(-3.6, 0.9, 15.7), ALONG, 6.0):
+		_player.velocity.y = 2.0 # rising, so the ground snap does not pull the rider down before the rail
 		board.state = Skateboard.State.AIR
 		board._was_on_floor = false
 		board._old_position = _player.global_position

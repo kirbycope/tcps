@@ -105,3 +105,24 @@ run again:
 
 The autopilot film of the same run is in the review's history; the rider now ollies onto the ledge's front
 rail and the bench, grinds them, manuals across the flat, and glances off the wall instead of sitting in it.
+
+## After the camera and the real numbers (commit `HEAD`)
+
+The camera is now THUG's `CSkaterCameraComponent` (`skateboard_camera.gd`), and every tunable in the board,
+the balance and the camera is the value from THUG's own `physics.q`, found decompiled at
+`atljp/thps-modding-resources` and tabled in `docs/thug_skater_reference.md`. Measured again:
+
+| Measure | THUG's number | Here |
+| --- | --- | --- |
+| Standing push | 664 in/s^2 to 445 in/s | 16.9 m/s^2, 11.3 m/s reached in 1.0 s |
+| Coast, 4 s from 10 m/s | wind 0.00001 f | 5.1 m/s left: the wind is real in THUG |
+| Ollie, tapped / held | 350 / 432 in/s pop at 1350 in/s^2 | 0.50 s and 1.1 m / 0.62 s and 1.7 m; THUG's footage showed about 0.65 s |
+| Turn at top speed | 1.8 rad/s | 102 deg/s, constant, speed kept |
+| Quarter pipe at a crouched push | 15.3 m/s into the wall | 0.7 s air, 1.1 m over the coping, 11.5 m/s kept on landing, back onto the same wall |
+| Ledge grind | 40 in snap, 150 in/s boost | taken 0.05 s after arrival |
+
+Two things the numbers forced. The demo's 3.3 m half pipe is taller than THUG's ramps for a standing push,
+which tops out at 11.3 m/s, so the crouched push (sprint, THUG's held X) is what reaches its coping; and a
+board leaving the top of a wall now does so by THUG's `Ground_stick_angle` rule rather than by the body
+sliding round the coping onto the deck. The film shows the camera pitching up the transition, going overhead
+in vert air and swinging back behind on landing.

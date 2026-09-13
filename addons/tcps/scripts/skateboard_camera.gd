@@ -13,9 +13,9 @@ extends Camera3D
 ## and above the skater from the tripod and is aimed at the true skater, so the lag reads as distance and
 ## speed. In vert air the target forward is straight down, the tripod stops lagging, and the frame's up is the
 ## wall's normal, so the camera rides overhead with the skater and watches them go up and come back down the
-## same wall; for a moment after the landing it swings back behind them faster. On a rail it zooms in a little
-## and rolls with the balance. THUG's numbers live in physics.q, which is not in the source; the values here
-## are its constructor fallbacks where it has them and set by feel against its footage where it does not.
+## same wall; for a moment after the landing it swings back behind them faster. On a rail it rolls with the
+## balance. The numbers are THUG's Skater_Camera_Standard_Medium from physics.q (the decompiled scripts at
+## atljp/thps-modding-resources), feet turned to metres; THUG does not zoom on a grind, so grind_zoom is 1.
 
 const VERT_AIR_LANDED_TIME: float = 10.0 / 60.0 ## VERT_AIR_LANDED_TIME: the faster swing back after a vert landing lasts this long.
 const VERT_CAM_DELAY: float = 0.2 ## Vert air becomes the vert cam once the chance to break vert has passed (Skater_Vert_Allow_break_Time).
@@ -29,20 +29,20 @@ const MIN_DISTANCE: float = 0.3 ## 11.9 in: the collision never brings the camer
 const WALL_MARGIN: float = 0.05 ## 2 in kept off whatever the camera ray hit.
 const SIDE_FEELER: float = 0.2 ## 8 in feelers either side of the camera.
 
-@export var behind: float = 3.6 ## Metres behind the frame the camera sits ("behind", a physics.q value).
-@export var above: float = 1.4 ## Metres above the skater's feet, along their up, both for the camera and for what it looks at ("above").
-@export var tilt: float = deg_to_rad(8.0) ## Resting downward tilt of the frame ("tilt").
-@export var field_of_view: float = 55.0 ## Vertical degrees; THUG's "horiz_fov" of about 72 at 16:10.
-@export var slerp: float = 0.12 ## Fraction of the way to the target frame per sixtieth of a second ("slerp").
-@export var vert_air_slerp: float = 0.08 ## The same in vert air ("vert_air_slerp").
-@export var vert_air_landed_slerp: float = 0.3 ## And just after a vert landing ("vert_air_landed_slerp").
+@export var behind: float = 12.0 * 0.3048 ## Metres behind the frame the camera sits ("behind", 12 ft).
+@export var above: float = 4.3 * 0.3048 ## Metres above the skater's feet, along their up, both for the camera and for what it looks at ("above", 4.3 ft).
+@export var tilt: float = 0.18 ## Resting downward tilt of the frame, radians ("tilt").
+@export var field_of_view: float = 49.0 ## Vertical degrees: THUG's "horiz_fov" of 72 at 16:10.
+@export var slerp: float = 0.04 ## Fraction of the way to the target frame per sixtieth of a second ("slerp").
+@export var vert_air_slerp: float = 0.04 ## The same in vert air ("vert_air_slerp").
+@export var vert_air_landed_slerp: float = 0.375 ## And just after a vert landing ("vert_air_landed_slerp").
 @export var lerp_xz: float = 0.25 ## Fraction of the way the tripod moves toward the skater sideways per sixtieth ("lerp_xz").
-@export var lerp_y: float = 0.5 ## And up ("lerp_y").
+@export var lerp_y: float = 0.75 ## And up ("lerp_y").
 @export var vert_air_lerp_xz: float = 1.0 ## In vert air the tripod is on the skater ("vert_air_lerp_xz").
 @export var vert_air_lerp_y: float = 1.0 ## ("vert_air_lerp_y")
 @export var grind_lerp: float = 0.1 ## How fast the roll follows the grind lean ("grind_lerp").
 @export var zoom_lerp: float = 0.0625 ## How fast the zoom moves ("zoom_lerp").
-@export var grind_zoom: float = 0.8 ## Behind is this much of itself on a rail ("grind_zoom").
+@export var grind_zoom: float = 1.0 ## Behind is this much of itself on a rail ("grind_zoom"; THUG leaves it at 1).
 @export var lookaround_max: Vector2 = Vector2(deg_to_rad(120.0), deg_to_rad(45.0)) ## Manual look is an offset on the frame (heading, tilt), not a free camera.
 @export var lookaround_return: float = 3.0 ## Per-second rate the offset eases back once the look input stops.
 

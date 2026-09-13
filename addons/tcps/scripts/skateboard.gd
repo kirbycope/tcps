@@ -47,38 +47,47 @@ const LOCOMOTION: String = "SkateboardingLocomotion" ## The rider's rolling anim
 const KICK_PUSH: String = "SkateboardingKickPush" ## The rider's push-off animation node.
 const LOCOMOTION_BLEND_PATH: String = "parameters/LocomotionStateMachine/SkateboardingLocomotion/blend_position"
 
-# THUG's tunables live in physics.q, which is not in the source; these are set by feel against its footage. The
-# THUG name each stands in for is beside it. Metres and seconds; THUG's are inches (39.37 to the metre).
+# THUG's own numbers from physics.q (the decompiled THUG scripts at atljp/thps-modding-resources), converted from
+# inches and milliseconds to metres and seconds, at the middle of each stat range (5 of 10; Special adds 3). The
+# THUG symbol is beside each. Gravity is THUG's, not the project's: 3.5 g in the air is what makes a pop snappy.
+const INCH: float = 0.0254
 const DEAD_ZONE: float = 0.39 ## THUG reads the stick as a d-pad past 50 of 128; nothing is proportional.
-const KICK_ACCELERATION: float = 6.0 ## Physics_Standing_Acceleration_stat: a kick is this much every second it is held.
-const KICK_MAX_SPEED: float = 12.0 ## Skater_Max_Standing_Kick_Speed_Stat: kicking does nothing past this.
-const SPRINT_KICK_SCALE: float = 1.5 ## Holding sprint kicks harder and up to [constant MAX_SPEED].
-const MAX_SPEED: float = 16.0 ## Skater_Max_Speed_Stat: above this the heavy drag applies.
-const MAX_MAX_SPEED: float = 20.0 ## Skater_Max_Max_Speed_Stat: never faster.
-const WIND_DRAG: float = 0.004 ## Physics_Standing_Air_Friction: quadratic in speed; there is no rolling friction, as with THUG's autokick.
-const HEAVY_DRAG: float = 0.05 ## Physics_Heavy_Air_Friction: the drag above [constant MAX_SPEED].
-const BRAKE: float = 8.0 ## Physics_Brake_Acceleration.
-const TURN_RATE: float = 2.0 ## Physics_Ground_Rotation: radians per second, whatever the speed.
-const SHARP_TURN_RATE: float = 3.5 ## Physics_Ground_Sharp_Rotation: with Down held.
+const KICK_ACCELERATION: float = 664.5 * INCH ## Physics_Standing_Acceleration_Stat 629..700: a kick is this much every second it is held.
+const KICK_MAX_SPEED: float = 445.0 * INCH ## Skater_Max_Standing_Kick_Speed_Stat 394..496: kicking does nothing past this.
+const CROUCH_KICK_ACCELERATION: float = 1128.5 * INCH ## Physics_Crouching_Acceleration_stat 1057..1200: holding sprint is THUG's crouched kick.
+const CROUCH_KICK_MAX_SPEED: float = 603.5 * INCH ## Skater_Max_Crouched_Kick_Speed_Stat 532..675.
+const MAX_SPEED: float = 828.5 * INCH ## Skater_Max_Speed_Stat 757..900: above this the heavy drag applies.
+const MAX_MAX_SPEED: float = 1028.5 * INCH ## Skater_Max_Max_Speed_Stat 957..1100: never faster.
+const WIND_DRAG: float = 0.00001 * 60.0 / INCH ## Physics_Standing_Air_Friction: THUG takes f * 60 * v^2 in/s^2 off each second; there is no rolling friction to speak of.
+const CROUCH_WIND_DRAG: float = 0.000002 * 60.0 / INCH ## Physics_Crouched_Air_Friction: a fifth of it crouched.
+const HEAVY_DRAG: float = 0.0001 * 60.0 / INCH ## Physics_Heavy_Air_Friction: the drag above [constant MAX_SPEED].
+const BRAKE: float = 900.0 * INCH ## Physics_Brake_Acceleration.
+const TURN_RATE: float = 1.8 ## Physics_Ground_Rotation: radians per second, whatever the speed.
+const SHARP_TURN_RATE: float = 3.6 ## Physics_Ground_Sharp_Rotation: with Down held.
 const STOPPED_TURN_RAMP_TIME: float = 0.6 ## STOPPED_TURN_RAMP_TIME: the turn ramps in over this while nearly stopped.
-const SLOW_SPEED: float = 1.25 ## THUG's 50 in/s: below it a turn ramps and a brake stops you.
-const FLIP_SPEED: float = 0.5 ## Skater_Flip_Speed: rolling backwards faster than this turns the skater round.
+const STOPPED_SPEED: float = 10.0 * INCH ## Below THUG's 10 in/s the turn ramps.
+const SLOW_SPEED: float = 50.0 * INCH ## THUG's 50 in/s: below it a brake stops you.
+const FLIP_SPEED: float = 1.0 * INCH ## Skater_Flip_Speed: rolling backwards faster than this turns the skater round.
 const WALL_BOUNCE_DONT_SLOW_ANGLE: float = deg_to_rad(30.0) ## Wall_Bounce_Dont_Slow_Angle: a glance shallower than this keeps its speed.
-const OLLIE_MIN_SPEED: float = 3.0 ## Physics_Jump_Speed_min_stat: a tap.
-const OLLIE_MAX_SPEED: float = 5.0 ## Physics_Jump_Speed_stat: a full hold, about a metre up at 1.2 g.
-const VERT_OLLIE_MIN_SPEED: float = 1.5 ## Physics_air_Jump_Speed_min_stat: the pop off a vert wall is smaller.
-const VERT_OLLIE_MAX_SPEED: float = 3.0 ## Physics_air_Jump_Speed_stat.
-const MAX_TENSE_TIME: float = 0.5 ## skater_max_tense_time: holding longer adds nothing.
+const OLLIE_MIN_SPEED: float = 350.0 * INCH ## Physics_Jump_Speed_min_Stat: a tap.
+const OLLIE_MAX_SPEED: float = 432.0 * INCH ## Physics_Jump_Speed_Stat 414..450: a full hold.
+const VERT_OLLIE_MIN_SPEED: float = 100.0 * INCH ## Physics_Air_Jump_Speed_min_Stat: the pop off a vert wall is smaller.
+const VERT_OLLIE_MAX_SPEED: float = 275.0 * INCH ## Physics_Air_Jump_Speed_Stat.
+const MAX_TENSE_TIME: float = 0.2 ## Skater_max_tense_time: holding longer adds nothing.
 const OLLIE_GRACE: float = 0.15 ## Seconds after a pop during which the floor is ignored, so a curving wall cannot catch the board and bleed the pop.
-const AIR_SPIN_SPEED: float = TAU ## Physics_air_rotation_stat: radians per second with Left or Right held in the air.
-const AIR_NO_ROTATE_TIME: float = 0.08 ## Physics_Air_No_Rotate_Time: a tap does not spin.
-const AIR_RAMP_ROTATE_TIME: float = 0.25 ## Physics_Air_Ramp_Rotate_Time: the spin reaches full rate at this hold.
-const RAIL_MAX_SNAP: float = 0.6 ## Rail_Max_Snap: how far a rail can be from the board's path and still take it.
+const GROUND_GRAVITY: float = 1000.0 * INCH ## Physics_Ground_Gravity, along the surface.
+const AIR_GRAVITY: float = 1350.0 * INCH ## Physics_Air_Gravity: 3.5 g.
+const RAIL_GRAVITY: float = 2000.0 * INCH ## Physics_Rail_Gravity, along the rail.
+const AIR_HANG: float = 1.0 ## Physics_Air_hang_Stat: air gravity is divided by it.
+const VERT_HANG: float = 1.1 ## Physics_Vert_hang_Stat: a touch floatier in vert air.
+const AIR_SPIN_SPEED: float = 7.3 ## Physics_Air_Rotation_stat 6.85..7.75: radians per second with Left or Right held in the air.
+const AIR_NO_ROTATE_TIME: float = 0.1 ## Physics_Air_No_Rotate_Time: a tap does not spin.
+const AIR_RAMP_ROTATE_TIME: float = 0.15 ## Physics_Air_No_Rotate_Time plus Physics_Air_Ramp_Rotate_Time: the spin reaches full rate at this hold.
+const RAIL_MAX_SNAP: float = 40.0 * INCH ## Rail_Max_Snap: how far a rail can be from the board's path and still take it.
 const RAIL_PARALLEL_WEIGHT: float = 0.122 ## rail.cpp:1074: a rail you travel along scores eight times better than one across you.
-const RAIL_GRAVITY_SCALE: float = 1.0 ## Physics_Rail_Gravity as a share of gravity, along the rail.
-const RAIL_REGRIND_TIME: float = 0.35 ## Rail_Minimum_Rerail_Time: after riding off the end.
-const RAIL_JUMP_REGRIND_TIME: float = 0.5 ## Rail_jump_rerail_time: after an ollie off.
-const RAIL_HOP: float = 0.03 ## THUG lifts the skater an inch leaving a rail so the rail does not catch them again.
+const RAIL_REGRIND_TIME: float = 0.5 ## Rail_minimum_rerail_time: after riding off the end.
+const RAIL_JUMP_REGRIND_TIME: float = 0.3 ## Rail_jump_rerail_time: after an ollie off.
+const RAIL_HOP: float = 1.0 * INCH ## THUG lifts the skater an inch leaving a rail so the rail does not catch them again.
 const MANUAL_TAP_WINDOW: float = 0.25 ## The two taps of a manual (Up then Down, or Down then Up) within this.
 const MANUAL_MIN_SPEED: float = 1.0 ## A manual slower than this falls over.
 const BAIL_TIME: float = 0.8 ## Seconds the rider is a passenger after a bail.
@@ -86,12 +95,11 @@ const BAIL_SPEED_SCALE: float = 0.25 ## What a bail leaves of the speed.
 const RAMP_FLOOR_MAX_ANGLE: float = deg_to_rad(88.0) ## Transitions stay "floor" almost to vertical, so the board rides them instead of hitting a wall.
 const RAMP_FLOOR_SNAP_LENGTH: float = 1.0 ## Keeps the board glued to a curving transition at speed.
 const VERT_ANGLE: float = deg_to_rad(50.0) ## Leaving a floor steeper than this is a vert launch.
-const VERT_GRAVITY_SCALE: float = 1.0 ## THUG divides air gravity by a hang stat in vert air; a touch floatier than regular air.
 const VERT_TRACK_REACH: float = 1.5 ## Metres behind the skater the wall must still be for vert tracking to hold (THUG's tracking feeler).
-const BREAK_VERT_SPEED_SCALE: float = 0.5 ## Holding forward at the lip breaks vert: this share of the speed is thrown over the deck.
-const BREAK_VERT_UP_SCALE: float = 0.8 ## And the climb is trimmed by this.
-const GROUND_GRAVITY_SCALE: float = 1.0
-const AIR_GRAVITY_SCALE: float = 1.2 ## A little floatier than rolling, for hang time over the lip.
+const GROUND_STICK_ANGLE: float = deg_to_rad(30.0) ## Ground_stick_angle: a surface that turns away faster than this in one tick is left behind, which is how the lip of a wall becomes an air rather than a deck.
+const VERT_PUSH_OUT: float = 3.0 * INCH ## Physics_Vert_Push_Out: the skater is held this far off the wall through vert air, so the body clears the coping on the way down.
+const BREAK_VERT_SPEED_SCALE: float = 0.75 ## physics_break_air_speed_scale: holding forward at the lip breaks vert, and this share of the speed goes over the deck.
+const BREAK_VERT_UP_SCALE: float = 0.75 ## physics_break_air_up_scale: and the climb is trimmed to this.
 const MODEL_TILT_SPEED: float = 12.0 ## How fast the model leans onto a transition.
 const AIR_TILT_SPEED: float = 2.5 ## How fast the lean eases back upright over flat air; vert air keeps the wall's lean.
 const MANUAL_TILT: float = deg_to_rad(25.0) ## How far the model pitches at the edge of the meter in a manual.
@@ -384,6 +392,13 @@ func ride(_player: Player, delta: float) -> void:
 	else:
 		var on_floor: bool = player.is_on_floor() and _ollie_grace <= 0.0
 		var normal: Vector3 = player.get_floor_normal() if on_floor else up
+		if on_floor and state == State.GROUND and normal.angle_to(last_floor_normal) > GROUND_STICK_ANGLE and last_floor_normal.angle_to(up) > VERT_ANGLE:
+			# The wall turned into the deck under the board faster than a board can follow (THUG's snap_to_ground and
+			# Ground_stick_angle): the board has left the wall, and the floor is ignored for a moment so the coping
+			# cannot catch it on the way up
+			on_floor = false
+			normal = up
+			_ollie_grace = OLLIE_GRACE
 		if on_floor:
 			if not _was_on_floor:
 				_land(normal)
@@ -434,12 +449,15 @@ func ride(_player: Player, delta: float) -> void:
 ## the board never slides, and a kick, a brake or the wind changes the speed.
 func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void:
 	var up: Vector3 = player.up_direction
-	var gravity: Vector3 = player.get_gravity()
+	var gravity: Vector3 = -up * GROUND_GRAVITY
 	var lift: float = maxf(player.velocity.dot(normal), 0.0) # an ollie's push off the surface, kept so the board leaves it
 	var velocity: Vector3 = rotate_to_plane(player.velocity - normal * lift, normal)
-	velocity += gravity.slide(normal) * GROUND_GRAVITY_SCALE * delta
+	velocity += gravity.slide(normal) * delta
 
-	var braking: bool = motion.y < 0.0 and balance == null
+	# Down is the sharp turn while Left or Right is held at speed, and the brake otherwise (is_trying_to_brake)
+	var down: bool = motion.y < 0.0 and balance == null
+	var speed: float = (player.velocity - normal * lift).length()
+	var braking: bool = down and (motion.x == 0.0 or speed < SLOW_SPEED)
 	var forward: Vector3 = player.orientation.basis.z.slide(normal)
 	if forward.length_squared() < 0.001:
 		forward = velocity.slide(normal)
@@ -448,11 +466,11 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 		forward = forward.normalized()
 
 	# Turning: a constant rate about the surface normal, ramped in from a standstill (handle_ground_rotation)
-	var speed: float = velocity.length()
+	speed = velocity.length()
 	if motion.x != 0.0 and balance == null:
 		_turn_hold += delta
-		var rate: float = SHARP_TURN_RATE if braking else TURN_RATE
-		if speed < SLOW_SPEED:
+		var rate: float = SHARP_TURN_RATE if down else TURN_RATE
+		if speed < STOPPED_SPEED:
 			rate *= clampf(_turn_hold / STOPPED_TURN_RAMP_TIME, 0.0, 1.0)
 		var rot: float = -motion.x * rate * delta
 		player.orientation.basis = Basis(normal, rot) * player.orientation.basis
@@ -471,12 +489,12 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 	# Kick, brake, drag: on the speed alone (do_kick, do_brake, the friction block and limit_speed)
 	var kicking: bool = motion.y > 0.0 or player.current_locomotion_node == KICK_PUSH
 	if braking:
-		speed = maxf(speed - BRAKE * delta, 0.0)
+		speed = 0.0 if speed < 2.0 * BRAKE * delta else speed - BRAKE * delta
 	elif kicking and balance == null:
-		var cap: float = MAX_SPEED if sprint else KICK_MAX_SPEED
+		var cap: float = CROUCH_KICK_MAX_SPEED if sprint else KICK_MAX_SPEED
 		if speed < cap:
-			speed = minf(speed + KICK_ACCELERATION * (SPRINT_KICK_SCALE if sprint else 1.0) * delta, cap)
-	speed -= WIND_DRAG * speed * speed * delta
+			speed = minf(speed + (CROUCH_KICK_ACCELERATION if sprint else KICK_ACCELERATION) * delta, cap)
+	speed -= (CROUCH_WIND_DRAG if sprint else WIND_DRAG) * speed * speed * delta
 	if speed > MAX_SPEED:
 		speed -= HEAVY_DRAG * speed * speed * delta
 	speed = clampf(speed, 0.0, MAX_MAX_SPEED)
@@ -556,7 +574,7 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 			player.orientation.basis = Basis(up, -motion.x * AIR_SPIN_SPEED * ramp * delta) * player.orientation.basis
 	else:
 		_air_spin_hold = 0.0
-	var gravity: Vector3 = player.get_gravity()
+	var gravity: Vector3 = -up * AIR_GRAVITY
 	if vert_normal != Vector3.ZERO and not _wall_still_behind():
 		vert_out = Vector3.ZERO # off the end of the wall: THUG drops tracking and the skater recovers as regular air
 		vert_normal = Vector3.ZERO
@@ -564,9 +582,9 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 		var drift: float = (player.global_position - _vert_point).dot(vert_normal)
 		if not is_zero_approx(drift):
 			player.global_position -= vert_normal * drift
-		player.velocity = player.velocity.slide(vert_normal) + gravity * VERT_GRAVITY_SCALE * delta
+		player.velocity = player.velocity.slide(vert_normal) + gravity / VERT_HANG * delta
 	else:
-		player.velocity += gravity * AIR_GRAVITY_SCALE * delta
+		player.velocity += gravity / AIR_HANG * delta
 
 
 ## Whether the wall the skater launched from is still behind them at the launch height (THUG's tracking feeler).
@@ -598,6 +616,7 @@ func _launch(up: Vector3) -> void:
 		return
 	vert_out = out
 	vert_normal = -out
+	player.global_position += vert_normal * VERT_PUSH_OUT
 	_vert_point = player.global_position
 	player.velocity = vert_launch_velocity(player.velocity, vert_normal)
 
@@ -689,7 +708,7 @@ func _grind(motion: Vector2, delta: float) -> void:
 		_leave_rail(RAIL_REGRIND_TIME)
 		return
 	var direction: Vector3 = rail.direction_at(rail_offset)
-	rail_speed += player.get_gravity().dot(direction * rail_sign) * RAIL_GRAVITY_SCALE * delta
+	rail_speed += (-player.up_direction * RAIL_GRAVITY).dot(direction * rail_sign) * delta
 	if rail_speed < 0.0:
 		rail_speed = -rail_speed
 		rail_sign = -rail_sign
@@ -731,7 +750,7 @@ func _leave_rail(regrind_time: float) -> void:
 
 func _start_trick(kind: String) -> void:
 	balance = SkateBalance.new()
-	balance.setup()
+	balance.setup(kind == "grind")
 	trick = kind
 	trick_started.emit(kind)
 

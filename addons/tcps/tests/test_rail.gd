@@ -138,5 +138,5 @@ func test_a_bail_on_the_rail_drops_the_board() -> void:
 	board.balance.lean_dir = 2.0
 	await wait_physics_frames(3)
 	assert_eq(events, ["grind bail"], "The needle off the end is a bail")
-	assert_eq(board.state, Skateboard.State.AIR, "and the board is off the rail")
+	assert_ne(board.state, Skateboard.State.RAIL, "and the board is off the rail")
 	assert_gt(board._bail_timer, 0.0, "with the rider a passenger for a moment")

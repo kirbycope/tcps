@@ -53,6 +53,8 @@ Looking at the board and pressing Action mounts it: `Skateboard.equip()` calls `
 
 Animations are the Player's: the board asks for them through `locomotion_requested("SkateboardingLocomotion" / "SkateboardingKickPush")`, `locomotion_blend_requested`, and `jump_requested`, which the `Riding` state connects to the Player's AnimationTree.
 
+The board's own animations are in `skateboard.tscn`: the mesh hangs off a `Board` pivot, and the scene's `AnimationPlayer` turns that pivot (`Board:rotation`) with one animation per trick, named as the trick is in snake case (`ollie`, `kickflip`, `heelflip`, `pop_shove_it`, `impossible`, `hardflip`; `Skateboard.animation_name_for("Pop Shove-It")` gives `pop_shove_it`). A pop plays `ollie`, a flip trick plays its own, and each flip lasts `SkateTricks.FLIP_TIME`; landing or taking a rail stops whatever is playing and puts the pivot back level. To animate a new trick, add an animation of that name to the player and it plays; a trick with no animation of its own leaves the board still.
+
 Over the network the board is one node in the world on every peer, and its `BodySynchronizer` (`resources/skateboard_replication.tres`) carries its position, rotation and `rider_peer`, the peer whose Player is on it (0 when it is free). Getting on asks the server to put the board under the rider's model on every peer and then hand it to the rider's peer, in that order, so the rider's copy starts sending its place only once everybody has it under their feet; getting off does the same back to the parent it stood under and to the server. A rider who drops out is handed back by every peer on its own, and a board another peer is riding refuses a second rider. Offline there is nobody to ask and the hand-off is immediate.
 
 ---

@@ -164,6 +164,8 @@ var _sfx_was_jumping: bool = false
 var _sfx_was_falling: bool = false
 
 @onready var camera: SkateboardCamera = $SkateboardCamera ## The view while ridden (rideable contract).
+@onready var board_pivot: Node3D = $Board ## The mesh hangs off this; the animations turn it.
+@onready var animation_player: AnimationPlayer = $AnimationPlayer ## "ollie" and one animation per flip trick, named in snake case.
 @onready var action_prompt: ActionPrompt = $ActionPrompt
 @onready var ground_ray: RayCast3D = $GroundRay ## What the board rolls on, for the roll sounds.
 @onready var area: Area3D = $Area3D
@@ -590,6 +592,7 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 		_leave_rail(RAIL_JUMP_REGRIND_TIME)
 		player.velocity += up * lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
 		_ollie_grace = OLLIE_GRACE
+		_play_board("ollie")
 		return
 	if vert_normal != Vector3.ZERO and not player.is_on_floor() and player.velocity.dot(up) < 0.0:
 		player.velocity += vert_normal * lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
@@ -599,6 +602,7 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 	var from_vert: bool = player.is_on_floor() and vert_launch_direction(player.get_floor_normal(), up) != Vector3.ZERO
 	var pop: float = lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge) if from_vert else lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
 	_end_trick(false)
+	_play_board("ollie")
 	player.velocity += up * (pop - minf(player.velocity.dot(up), 0.0))
 	if player.is_on_floor() and _ollie_grace <= 0.0:
 		# Off the ground right now: decide vert from the surface under the board, and keep the wall from catching the pop
@@ -746,6 +750,8 @@ func _got_rail(on: Rail, hit: Dictionary) -> void:
 	state = State.RAIL
 	_was_on_floor = false
 	_air_time = 0.0
+	_reset_board()
+	air_trick = ""
 	player.global_position = hit["point"]
 	player.velocity = direction * rail_sign * rail_speed
 	player.model_pitch = 0.0
@@ -845,6 +851,28 @@ func _start_air_trick(kind: String, named: Array) -> void:
 	_air_trick_time = 0.0
 	tricks.add(named[0], named[1])
 	_bank_timer = 0.0
+	if kind == "flip":
+		_play_board(animation_name_for(named[0]))
+
+
+## The board's animation for a trick name: "Pop Shove-It" is "pop_shove_it".
+static func animation_name_for(trick_name: String) -> String:
+	return trick_name.to_lower().replace(" ", "_").replace("-", "_")
+
+
+## Plays [param animation] on the board's mesh when the board has it; the mesh is put back level first.
+func _play_board(animation: String) -> void:
+	if animation_player == null or not animation_player.has_animation(animation):
+		return
+	animation_player.play(animation)
+
+
+## Puts the mesh back level: the end of a flip on landing, or a bail mid-flip.
+func _reset_board() -> void:
+	if animation_player and animation_player.is_playing():
+		animation_player.stop()
+	if board_pivot:
+		board_pivot.rotation = Vector3.ZERO
 
 
 ## Runs the timers behind the combo each tick: the air trick's time, the points a hold earns, and the grace after a
@@ -870,6 +898,7 @@ func _tick_tricks(delta: float) -> void:
 ## a vert landing opens the revert window, and the combo waits [constant BANK_GRACE] for a manual or a revert
 ## before it is banked. THUG's physics never refuses a landing; this is its Landed script's decision.
 func _settle_landing(from_vert: bool) -> void:
+	_reset_board()
 	var sloppy_spin: bool = SkateTricks.spin_is_sloppy(_spin_tally)
 	var mid_flip: bool = air_trick != "" and _air_trick_kind == "flip" and _air_trick_time < SkateTricks.FLIP_TIME
 	if mid_flip or sloppy_spin:

@@ -216,3 +216,30 @@ func test_the_hud_shows_the_combo_and_the_score() -> void:
 	board._refresh_hud()
 	assert_false(board.trick_line.visible, "Nothing in the combo, nothing on the line")
 	assert_eq(board.score_label.text, "SCORE 400")
+
+
+func test_the_board_has_an_animation_for_the_ollie_and_every_flip() -> void:
+	assert_true(board.animation_player.has_animation("ollie"))
+	for flip: Array in SkateTricks.FLIPS.values():
+		var animation: String = Skateboard.animation_name_for(flip[0])
+		assert_true(board.animation_player.has_animation(animation), "%s has the animation %s" % [flip[0], animation])
+		assert_almost_eq(board.animation_player.get_animation(animation).length, SkateTricks.FLIP_TIME, 0.01, "%s takes as long as the trick" % flip[0])
+	assert_eq(board.animation_player.get_animation("kickflip").track_get_path(0), NodePath("Board:rotation"), "The animations turn the pivot the mesh hangs off")
+
+
+func test_the_pop_and_a_flip_turn_the_board_and_a_landing_puts_it_back() -> void:
+	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	assert_eq(board.animation_player.current_animation, "ollie", "The pop plays the ollie")
+	await wait_physics_frames(3)
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.animation_player.current_animation, "kickflip", "and the flip its own animation")
+	await wait_physics_frames(12)
+	assert_gt(absf(board.board_pivot.rotation.z), 0.5, "A fifth of a second in, the board has rolled part of the way round")
+	var frames: int = 0
+	while board.state != Skateboard.State.GROUND and frames < 120:
+		await get_tree().physics_frame
+		frames += 1
+	await wait_physics_frames(2)
+	assert_almost_eq(board.board_pivot.rotation, Vector3.ZERO, Vector3.ONE * 0.01, "On landing the board is level again")
+	assert_false(board.animation_player.is_playing())

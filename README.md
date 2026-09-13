@@ -26,6 +26,22 @@ Clone it, open `project.godot` in Godot, and run the demo scene. The addon is mo
 anywhere first. Installing through the Asset Library takes `addons/` and skips the root
 `project.godot` as a conflict, which is why that file can live here harmlessly.
 
+## Filming and measuring the board
+
+Two scripts in `tools/` put numbers and pictures on how the board plays, so a change to the feel is checked
+rather than argued about. Neither is a test; both use the demo skate park.
+
+```powershell
+# Film a scripted run: an autopilot presses the real actions, Godot's movie writer draws every frame at 60 fps
+& 'C:\Godot\godot.exe' --path . --write-movie run.avi --fixed-fps 60 -s tools/record_run.gd
+
+# Print the push, coast, ollie, turn and quarter pipe numbers as JSON
+& 'C:\Godot\godot.exe' --headless --path . -s tools/measure_run.gd
+```
+
+`docs/feel_review.md` is the review made with them against Tony Hawk's Underground, and
+`docs/thug_skater_reference.md` is the digest of THUG's skater code it compares against.
+
 ## Installing it in a game
 
 Copy `addons/tcps/` into your project's `addons/`. See the

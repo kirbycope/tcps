@@ -1,8 +1,9 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="PackedScene" path="res://addons/3d_player_controller/scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://addons/tcps/scenes/skateboard.tscn" id="2_board"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/skate_park.gd" id="3_park"]
+[ext_resource type="Script" path="res://addons/tcps/scripts/rail.gd" id="4_rail"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.25, 0.45, 0.8, 1)
@@ -26,6 +27,46 @@ roughness = 0.9
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
 albedo_color = Color(0.72, 0.52, 0.32, 1)
 roughness = 0.8
+
+[sub_resource type="Curve3D" id="Curve3D_ledge_front"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -3, 0.2, -0.3, 0, 0, 0, 0, 0, 0, 3, 0.2, -0.3),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_ledge_back"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -3, 0.2, 0.3, 0, 0, 0, 0, 0, 0, 3, 0.2, 0.3),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_handrail"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -2.5, 0.9, 0, 0, 0, 0, 0, 0, 0, 2.5, 0.9, 0),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_bench_front"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -1, 0.225, -0.25, 0, 0, 0, 0, 0, 0, 1, 0.225, -0.25),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_bench_back"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -1, 0.225, 0.25, 0, 0, 0, 0, 0, 0, 1, 0.225, 0.25),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_steel"]
+albedo_color = Color(0.6, 0.62, 0.65, 1)
+metallic = 0.8
+roughness = 0.3
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_coping"]
 albedo_color = Color(0.85, 0.85, 0.85, 1)
@@ -99,6 +140,68 @@ polygon = PackedVector2Array(0, 0, 2, 0.9, 5, 0.9, 7, 0)
 depth = 4.0
 material = SubResource("StandardMaterial3D_wood")
 
+[node name="Ledge" type="CSGBox3D" parent="." groups=["CONCRETE"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 16)
+use_collision = true
+size = Vector3(6, 0.4, 0.6)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="FrontRail" type="Path3D" parent="Ledge"]
+curve = SubResource("Curve3D_ledge_front")
+script = ExtResource("4_rail")
+
+[node name="BackRail" type="Path3D" parent="Ledge"]
+curve = SubResource("Curve3D_ledge_back")
+script = ExtResource("4_rail")
+
+[node name="Handrail" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 20)
+
+[node name="Bar" type="CSGCylinder3D" parent="Handrail"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0.9, 0)
+use_collision = true
+radius = 0.03
+height = 5.0
+material = SubResource("StandardMaterial3D_steel")
+
+[node name="LeftPost" type="CSGCylinder3D" parent="Handrail"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0.45, 0)
+use_collision = true
+radius = 0.03
+height = 0.9
+material = SubResource("StandardMaterial3D_steel")
+
+[node name="RightPost" type="CSGCylinder3D" parent="Handrail"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4, 0.45, 0)
+use_collision = true
+radius = 0.03
+height = 0.9
+material = SubResource("StandardMaterial3D_steel")
+
+[node name="Rail" type="Path3D" parent="Handrail"]
+curve = SubResource("Curve3D_handrail")
+script = ExtResource("4_rail")
+
+[node name="Bench" type="CSGBox3D" parent="." groups=["WOOD"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.225, 16)
+use_collision = true
+size = Vector3(2, 0.45, 0.5)
+material = SubResource("StandardMaterial3D_wood")
+
+[node name="FrontRail" type="Path3D" parent="Bench"]
+curve = SubResource("Curve3D_bench_front")
+script = ExtResource("4_rail")
+
+[node name="BackRail" type="Path3D" parent="Bench"]
+curve = SubResource("Curve3D_bench_back")
+script = ExtResource("4_rail")
+
+[node name="Wall" type="CSGBox3D" parent="." groups=["CONCRETE"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 1.5, 25)
+use_collision = true
+size = Vector3(0.4, 3, 12)
+material = SubResource("StandardMaterial3D_concrete")
+
 [node name="Player" parent="." instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 2)
 
@@ -122,7 +225,7 @@ offset_right = 300.0
 offset_bottom = 110.0
 grow_horizontal = 2
 horizontal_alignment = 1
-text = "Hold Up to push. Ride up the wall, Ollie at the lip, Left/Right to spin in the air. K steps off the board."
+text = "Hold Up to push, Down to brake or turn sharp. Hold Ollie and let go to pop. Hold Grind in the air over the ledge, the bench or the handrail and balance with Left/Right. Tap Up then Down for a manual. K steps off."
 autowrap_mode = 3
 
 [connection signal="timeout" from="MountTimer" to="." method="_on_mount_timer_timeout"]

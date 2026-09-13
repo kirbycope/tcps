@@ -5,8 +5,9 @@ extends SceneTree
 ##     godot --headless --path . -s tools/measure_run.gd
 ##
 ## It puts the rider on the board in the skate park and prints, as JSON: the push from standstill (speed
-## against time, the top speed and when it was reached), coasting friction, a flat ollie (air time and peak
-## height), the turn rate at top speed, and a quarter pipe air (air time, peak height and the speed kept).
+## against time, the top speed and when it was reached), coasting friction, a flat ollie tapped and held (air
+## time and peak height), the turn rate at top speed, a quarter pipe air (air time, peak height and the speed
+## kept), and a grind along the ledge (time on the rail, speed on and off it).
 ## Each measurement starts from the same spot on the open concrete, facing along it, so nothing runs off
 ## the edge of the park.
 
@@ -47,9 +48,11 @@ func _physics_process(delta: float) -> bool:
 	match _phase:
 		0: _push(delta)
 		1: _coast(delta)
-		2: _ollie(delta)
-		3: _turn(delta)
-		4: _vert(delta)
+		2: _ollie(delta, "ollie_tap", 0.0)
+		3: _ollie(delta, "ollie_held", 0.5)
+		4: _turn(delta)
+		5: _vert(delta)
+		6: _grind(delta)
 		_:
 			print("MEASURE " + JSON.stringify(_results))
 			_done = true
@@ -123,31 +126,33 @@ func _coast(_delta: float) -> void:
 		_next()
 
 
-## At top speed tap jump once, time the air and note the peak height.
-func _ollie(delta: float) -> void:
+## At top speed press jump, hold it [param hold] seconds, let go, time the air and note the peak height.
+func _ollie(delta: float, key: String, hold: float) -> void:
 	if _place(START, ALONG, 10.0):
 		return
 	Input.action_press(&"move_up")
 	if _t < 0.5:
 		return
-	if not _results.has("ollie"):
+	if not _results.has(key):
 		_send(&"jump", true) # the board reads its jump from input events, not by polling
-		_results["ollie"] = {"start_height": snappedf(_player.global_position.y, 0.001), "speed": snappedf(_speed(), 0.01)}
+		_results[key] = {"start_height": snappedf(_player.global_position.y, 0.001), "speed": snappedf(_speed(), 0.01), "hold": hold}
+		return
+	if _t < 0.5 + hold:
 		return
 	_send(&"jump", false)
 	var on_floor: bool = _player.is_on_floor()
 	if not on_floor:
 		_air_t += delta
-		_peak = maxf(_peak, _player.global_position.y - float(_results["ollie"]["start_height"]))
+		_peak = maxf(_peak, _player.global_position.y - float(_results[key]["start_height"]))
 		_was_on_floor = false
 	elif not _was_on_floor and _air_t > 0.05:
-		_results["ollie"]["air_time"] = snappedf(_air_t, 0.01)
-		_results["ollie"]["peak_height"] = snappedf(_peak, 0.01)
-		_results["ollie"]["speed_after"] = snappedf(_speed(), 0.01)
+		_results[key]["air_time"] = snappedf(_air_t, 0.01)
+		_results[key]["peak_height"] = snappedf(_peak, 0.01)
+		_results[key]["speed_after"] = snappedf(_speed(), 0.01)
 		_next()
 		return
-	if _t > 6.0:
-		_results["ollie"]["air_time"] = -1.0
+	if _t > 6.0 + hold:
+		_results[key]["air_time"] = -1.0
 		_next()
 
 
@@ -188,4 +193,31 @@ func _vert(delta: float) -> void:
 	_was_on_floor = on_floor
 	if _t > 10.0:
 		_results["vert"] = {"air_time": -1.0, "note": "never left the wall or never landed", "y": snappedf(_player.global_position.y, 0.01)}
+		_next()
+
+
+## Thrown at the ledge's front rail in the air with Grind held: how long the grind lasts left alone (the meter
+## runs, nobody balancing) and the speed on and off the rail.
+func _grind(delta: float) -> void:
+	var board: Skateboard = _player.riding as Skateboard
+	if _place(Vector3(-3.6, 0.6, 15.7), ALONG, 6.0):
+		_player.velocity.y = 1.0 # rising, so the ground snap does not pull the rider down before the rail
+		board.state = Skateboard.State.AIR
+		board._was_on_floor = false
+		board._old_position = _player.global_position
+		Input.action_press(&"action")
+		_results["grind"] = {"took_rail": false}
+		return
+	if board.state == Skateboard.State.RAIL:
+		if not bool(_results["grind"]["took_rail"]):
+			_results["grind"] = {"took_rail": true, "took_after": snappedf(_t, 0.01), "speed_on": snappedf(board.rail_speed, 0.01), "time_on_rail": 0.0}
+		_results["grind"]["time_on_rail"] = snappedf(float(_results["grind"]["time_on_rail"]) + delta, 0.01)
+		return
+	if bool(_results["grind"]["took_rail"]) and _player.is_on_floor():
+		_results["grind"]["speed_after"] = snappedf(_speed(), 0.01)
+		_results["grind"]["bailed"] = board._bail_timer > 0.0
+		Input.action_release(&"action")
+		_next()
+	elif _t > 8.0:
+		Input.action_release(&"action")
 		_next()

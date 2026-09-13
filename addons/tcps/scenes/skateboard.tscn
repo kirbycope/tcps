@@ -52,6 +52,7 @@
 [ext_resource type="AudioStream" uid="uid://bls8s10hvef8u" path="res://addons/tcps/assets/gravitysound/Skateboard SFX/Land_10.ogg" id="50_0pqn3"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/skateboard_camera.gd" id="99_cam"]
 [ext_resource type="SceneReplicationConfig" path="res://addons/tcps/resources/skateboard_replication.tres" id="sync_config"]
+[ext_resource type="Script" path="res://addons/tcps/scripts/balance_meter.gd" id="meter"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_senyo"]
 size = Vector3(1.4, 0.4, 0.2)
@@ -164,3 +165,22 @@ one_shot = true
 
 [node name="BodySynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = ExtResource("sync_config")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="BalanceMeter" type="Control" parent="HUD"]
+visible = false
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -120.0
+offset_top = -170.0
+offset_right = 120.0
+offset_bottom = -146.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("meter")

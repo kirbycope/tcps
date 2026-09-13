@@ -41,16 +41,19 @@ class Driver extends Node:
 		{"to": Vector3(-22, 0, 8), "kind": "air"}, # up the quarter pipe and back down
 		{"to": Vector3(-8, 0, 8), "kind": "point"}, # roll away from it
 		{"to": Vector3(-22, 0, 8), "kind": "air", "spin": -1.0}, # again, spinning in the air
-		{"to": Vector3(2, 0, 6), "kind": "point"}, # over to the funbox
-		{"to": Vector3(17, 0, 6), "kind": "point", "ollie_at_x": 9.5}, # ollie up onto it and roll off
-		{"to": Vector3(16, 0, 0), "kind": "point"},
+		{"to": Vector3(-12, 0, 15.7), "kind": "point"}, # line up west of the ledge
+		{"to": Vector3(8, 0, 15.7), "kind": "air", "ollie_at_x": -4.6, "grind": true}, # ollie onto its front rail and grind it out
+		{"to": Vector3(10, 0, 19), "kind": "point"},
+		{"to": Vector3(-16, 0, 20), "kind": "point"}, # line up on the handrail
+		{"to": Vector3(0, 0, 20), "kind": "air", "ollie_at_x": -13.6, "grind": true}, # up onto the handrail
+		{"to": Vector3(2, 0, 6), "kind": "point", "manual_at_x": -6.0}, # a manual across the flat
+		{"to": Vector3(17, 0, 6), "kind": "point", "ollie_at_x": 9.5}, # over the funbox
+		{"to": Vector3(20, 0, 25), "kind": "point"},
+		{"to": Vector3(28, 0, 25), "kind": "point"}, # into the wall, head on
 		{"to": Vector3(0, 0, -10), "kind": "point"}, # into the half pipe's flat
 		{"to": Vector3(-9, 0, -10), "kind": "air"}, # left wall
-		{"to": Vector3(9, 0, -10), "kind": "air"}, # right wall
-		{"to": Vector3(-9, 0, -10), "kind": "air", "spin": 1.0},
-		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true}, # pop at the lip
-		{"to": Vector3(0, 0, 0), "kind": "point", "ollie_at_x": -2.0}, # flat ollie on the way out
-		{"to": Vector3(6, 0, 4), "kind": "point"},
+		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true}, # right wall, pop at the lip
+		{"to": Vector3(0, 0, 0), "kind": "point"},
 	]
 	const REACH: float = 1.5
 
@@ -62,6 +65,7 @@ class Driver extends Node:
 	var _was_on_floor: bool = true
 	var _left_ground: bool = false
 	var _ollied: bool = false
+	var _manualled: bool = false
 	var _leg_time: float = 0.0
 
 	func _physics_process(delta: float) -> void:
@@ -108,10 +112,21 @@ class Driver extends Node:
 		else:
 			_release_turn()
 
-		# Ollie where the leg asks for one
+		# Ollie where the leg asks for one, holding Grind through the air when it asks for that too
 		if spec.has("ollie_at_x") and not _ollied and on_floor and absf(here.x - float(spec["ollie_at_x"])) < 0.6:
 			_tap(&"jump")
 			_ollied = true
+			if spec.get("grind", false):
+				Input.action_press(&"action")
+		if spec.get("grind", false) and _ollied and landed:
+			Input.action_release(&"action")
+		# A manual: Up then Down, tapped as events the way the board reads them
+		if spec.has("manual_at_x") and not _manualled and on_floor and absf(here.x - float(spec["manual_at_x"])) < 0.6:
+			_manualled = true
+			_send(&"move_up", true)
+			_send(&"move_up", false)
+			_send(&"move_down", true)
+			_send(&"move_down", false)
 		if spec.get("ollie", false) and not _ollied and on_floor and _player.get_floor_normal().angle_to(Vector3.UP) > deg_to_rad(60.0):
 			_tap(&"jump")
 			_ollied = true
@@ -129,10 +144,11 @@ class Driver extends Node:
 		Input.action_release(&"move_left")
 		Input.action_release(&"move_right")
 
-	## The board reads its jump from input events rather than by polling, so a tap has to be a real event.
+	## The board reads its jump from input events rather than by polling, so a tap has to be a real event; the
+	## ollie is charged by the hold, so the button stays down a third of a second before it comes up.
 	func _tap(action: StringName) -> void:
 		_send(action, true)
-		get_tree().physics_frame.connect(_send.bind(action, false), CONNECT_ONE_SHOT)
+		get_tree().create_timer(0.3, false, true).timeout.connect(_send.bind(action, false))
 
 	static func _send(action: StringName, pressed: bool) -> void:
 		var event: InputEventAction = InputEventAction.new()
@@ -146,8 +162,10 @@ class Driver extends Node:
 		_leg_time = 0.0
 		_left_ground = false
 		_ollied = false
+		_manualled = false
 		_release_turn()
+		Input.action_release(&"action")
 
 	func _release_all() -> void:
-		for action: StringName in [&"move_up", &"move_left", &"move_right", &"jump", &"sprint"]:
+		for action: StringName in [&"move_up", &"move_left", &"move_right", &"jump", &"sprint", &"action"]:
 			Input.action_release(action)

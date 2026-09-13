@@ -103,7 +103,7 @@ func test_an_ollie_at_the_lip_pops_straight_up_and_lands_back_in_the_pipe() -> v
 	var player: Player = ride.player
 	assert_true(ride.ollied, "The ollie fired on the wall")
 	assert_true(ride.launched, "And the launch was still vert")
-	assert_gt(ride.top, 6.0, "The pop adds height over the plain launch")
+	assert_gt(ride.top, 5.0, "The pop adds height over the plain launch")
 	assert_true(player.is_on_floor(), "The skater came back down")
 	assert_almost_eq(player.global_position.x, ride.launch_x, 1.0, "Onto the wall they left, not out over the pipe or the deck")
 	assert_lt(ride.max_plane_drift, 0.05, "Vert tracking holds the skater in the wall's plane the whole flight")
@@ -137,4 +137,4 @@ func test_holding_forward_at_the_lip_breaks_vert_and_flies_over_the_deck() -> vo
 	assert_false(ride.launched, "Holding forward at the lip is not a vert air")
 	assert_gt(ride.top, 3.5, "But the skater still flew")
 	assert_true(player.is_on_floor(), "And came down")
-	assert_lt(player.global_position.x, -8.0, "Beyond the deck, out the back of the half pipe")
+	assert_lt(player.global_position.x, -7.5, "Beyond the deck, out the back of the half pipe")

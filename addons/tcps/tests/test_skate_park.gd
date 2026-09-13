@@ -50,9 +50,8 @@ func _ride_the_left_wall(ollie: bool, hold_forward: bool = false) -> Dictionary:
 	player.warp_to(Transform3D(Basis(), Vector3(1.0, 0.1, -10.0)))
 	player.rotate_model_to_direction(Vector3.LEFT)
 	await wait_physics_frames(3)
-	var ride: Dictionary = {"top": 0.0, "launched": false, "launch_x": 0.0, "shallowest_air_lean": PI, "ollied": false, "camera_travel_in_air": 0.0, "max_plane_drift": 0.0, "camera_below_skater_at_peak": false}
+	var ride: Dictionary = {"top": 0.0, "launched": false, "launch_x": 0.0, "shallowest_air_lean": PI, "ollied": false, "max_plane_drift": 0.0, "camera_above_skater_at_peak": false}
 	var launch_pos: Vector3 = Vector3.ZERO
-	var camera_at_launch: Vector3 = Vector3.ZERO
 	var air_frames: int = 0
 	var frames: int = 0
 	while frames < 400 and not (player.is_on_floor() and (ride.launched or (hold_forward and ride.top > 3.5))):
@@ -73,14 +72,11 @@ func _ride_the_left_wall(ollie: bool, hold_forward: bool = false) -> Dictionary:
 			if not ride.launched:
 				ride.launch_x = player.global_position.x
 				launch_pos = player.global_position
-				camera_at_launch = state.camera.global_position
 			ride.launched = true
 			ride.shallowest_air_lean = minf(ride.shallowest_air_lean, absf(player.model_pitch))
-			var camera_offset: Vector3 = state.camera.global_position - camera_at_launch
-			ride.camera_travel_in_air = maxf(ride.camera_travel_in_air, Vector2(camera_offset.x, camera_offset.z).length())
 			ride.max_plane_drift = maxf(ride.max_plane_drift, absf((player.global_position - launch_pos).dot(state.vert_normal)))
-			if absf(player.velocity.y) < 0.5 and state.camera.global_position.y < player.global_position.y - 1.0:
-				ride.camera_below_skater_at_peak = true
+			if absf(player.velocity.y) < 0.5 and state.camera.global_position.y > player.global_position.y + 1.0:
+				ride.camera_above_skater_at_peak = true
 	ride.player = player
 	return ride
 
@@ -107,8 +103,7 @@ func test_an_ollie_at_the_lip_pops_straight_up_and_lands_back_in_the_pipe() -> v
 	assert_true(player.is_on_floor(), "The skater came back down")
 	assert_almost_eq(player.global_position.x, ride.launch_x, 1.0, "Onto the wall they left, not out over the pipe or the deck")
 	assert_lt(ride.max_plane_drift, 0.05, "Vert tracking holds the skater in the wall's plane the whole flight")
-	assert_lt(ride.camera_travel_in_air, 3.0, "The camera swings out into the pipe and then stays parked at the ramp instead of chasing")
-	assert_true(ride.camera_below_skater_at_peak, "And watches the peak from below")
+	assert_true(ride.camera_above_skater_at_peak, "And the camera rides overhead, looking down at the peak, as THUG's vert cam does")
 
 
 func test_the_camera_settles_in_behind_the_way_the_board_travels() -> void:

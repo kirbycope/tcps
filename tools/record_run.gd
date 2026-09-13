@@ -37,10 +37,10 @@ class Driver extends Node:
 	## landed again (a wall ridden up and back down); "point" legs end within reach of the target. "ollie" legs
 	## pop once on the way; "spin" legs hold a direction in the air.
 	const LEGS: Array[Dictionary] = [
-		{"to": Vector3(-8, 0, 8), "kind": "point"}, # line up on the quarter pipe
-		{"to": Vector3(-22, 0, 8), "kind": "air"}, # up the quarter pipe and back down
-		{"to": Vector3(-8, 0, 8), "kind": "point"}, # roll away from it
-		{"to": Vector3(-22, 0, 8), "kind": "air", "spin": -1.0}, # again, spinning in the air
+		{"to": Vector3(-8, 0, 12), "kind": "point"}, # line up on the quarter pipe (it spans z 8 to 16)
+		{"to": Vector3(-22, 0, 12), "kind": "air"}, # up the quarter pipe and back down
+		{"to": Vector3(-8, 0, 12), "kind": "point"}, # roll away from it
+		{"to": Vector3(-22, 0, 12), "kind": "air", "spin": -1.0}, # again, spinning in the air
 		{"to": Vector3(-12, 0, 15.7), "kind": "point"}, # line up west of the ledge
 		{"to": Vector3(8, 0, 15.7), "kind": "air", "ollie_at_x": -4.6, "grind": true}, # ollie onto its front rail and grind it out
 		{"to": Vector3(10, 0, 19), "kind": "point"},

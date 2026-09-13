@@ -85,3 +85,23 @@ The rewrite in order of what it buys:
 Two things the review does not settle and that are the author's to decide: whether to rewrite in place
 (replace `skateboard.gd` and keep the scene, the sounds and the network code) or beside it, and whether the
 first pass stops at 1 to 3 (ground, air, rails, balance) or goes through the trick layer before it is tried.
+
+## After the first pass (commit `5f80c1f`)
+
+The board was rewritten in place around THUG's state machine with ground, air, rails and balance; the trick
+layer, lip tricks, walls beyond the bounce, transfers and the camera port are still to come. The same tools,
+run again:
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Push | 0 to 10 m/s in 1.0 s, 12 m/s^2 | 0 to 12 m/s in 2.5 s, a steady 6 m/s^2 kick to the kick cap |
+| Coast, 4 s from 10 m/s | 6.0 m/s | 8.6 m/s (wind only, no rolling friction) |
+| Flat ollie, tapped | 0.83 s, 1.02 m (one fixed pop) | 0.50 s, 0.37 m |
+| Flat ollie, held half a second | same as tapped | 0.82 s, 0.99 m |
+| Turn at top speed | 47 deg/s, eased | 66 deg/s, constant, speed kept, velocity along the facing |
+| Quarter pipe air | 1.5 s, 5.0 m, 5.1 m/s kept | 1.6 s, 5.4 m, 6.75 m/s kept |
+| Wall head-on | pinned, camera in the wall | stopped by the bounce, turned along it on a glance, never pinned |
+| Ledge grind, nobody balancing | no rails | taken 0.05 s after arrival at 7.0 m/s (6 plus the boost), 1.0 s on the rail before the meter bailed |
+
+The autopilot film of the same run is in the review's history; the rider now ollies onto the ledge's front
+rail and the bench, grinds them, manuals across the flat, and glances off the wall instead of sitting in it.

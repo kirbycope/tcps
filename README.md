@@ -45,7 +45,7 @@ $env:TCPS_FIRST_LEG = 25; $env:TCPS_TRACE = 1
 ```
 
 The run's legs are the list at the top of `tools/record_run.gd`: a target to steer at, and what to do on the way
-(an ollie at an x, a flip, a grab, a spin, a grind, a lip trick, a spine transfer, an acid drop, a wallplant).
+(an ollie at an x, a flip, a grab, a spin, a grind, a lip trick, a spine transfer, an acid drop, a wallplant, a walk off the board and back on).
 A crouched push turns with a four metre radius, so a leg that must arrive at a ramp square needs a straight run-in
 from the leg before it, and a tap's pop comes a third of a second (four and a half metres) after the tap.
 

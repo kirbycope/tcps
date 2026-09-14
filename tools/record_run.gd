@@ -98,7 +98,7 @@ class Driver extends Node:
 		if _player == null:
 			_player = park.get("player") as Player
 			return
-		if not _player.is_riding:
+		if not _player.is_riding and not _started:
 			return # the park's MountTimer has not put them on the board yet
 		if not _started:
 			_started = true
@@ -107,6 +107,8 @@ class Driver extends Node:
 				leg = int(first)
 				var at: Vector3 = LEGS[leg - 1]["to"]
 				_player.warp_to(Transform3D(Basis(), Vector3(at.x, 0.1, at.z)))
+		if _trace and not (_player.riding is Skateboard):
+			print("trace %.2f leg %d on foot pos %s vel %s floor %s motion %s" % [elapsed, leg, _player.global_position, _player.velocity, _player.is_on_floor(), _player.player_input.motion])
 		if _trace and _player.riding is Skateboard:
 			var b: Skateboard = _player.riding as Skateboard
 			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion])
@@ -134,17 +136,16 @@ class Driver extends Node:
 				_release_all()
 			elif _leg_time < 0.3 and _player.is_riding and not _ollied:
 				_ollied = true
-				_send(&"whistle", true)
-				_send(&"whistle", false)
+				_tap(&"whistle")
 			elif not _player.is_riding and _leg_time < 1.6:
 				Input.action_press(&"move_up")
 			elif not _player.is_riding and not _tricked:
 				_tricked = true
 				Input.action_release(&"move_up")
-				_send(&"jump", true)
-				_send(&"jump", false)
-				get_tree().create_timer(0.35, false, true).timeout.connect(_send.bind(&"whistle", true))
-				get_tree().create_timer(0.4, false, true).timeout.connect(_send.bind(&"whistle", false))
+				Input.action_press(&"jump") # the Player on foot reads the action's state as well as the event
+				_tap(&"jump")
+				get_tree().create_timer(0.3, false, true).timeout.connect(_release.bind(&"jump"))
+				get_tree().create_timer(0.7, false, true).timeout.connect(_tap.bind(&"whistle")) # after the jump's wind-up, in the air
 			if _tricked and _player.is_riding and on_floor and _leg_time > 2.5 or _leg_time > 8.0:
 				_next_leg()
 			return
@@ -265,6 +266,10 @@ class Driver extends Node:
 	func _tap(action: StringName) -> void:
 		_send(action, true)
 		get_tree().create_timer(0.3, false, true).timeout.connect(_send.bind(action, false))
+
+	## A timer's callable must be a script method: one bound to a native singleton method crashes Godot at exit.
+	static func _release(action: StringName) -> void:
+		Input.action_release(action)
 
 	static func _send(action: StringName, pressed: bool) -> void:
 		var event: InputEventAction = InputEventAction.new()

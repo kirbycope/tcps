@@ -98,3 +98,13 @@ func test_a_new_rider_starts_a_new_run() -> void:
 	await wait_physics_frames(3)
 	assert_true(player.is_riding)
 	assert_eq(board.tricks.score, 0, "A different rider's score does not carry over")
+
+
+func test_the_get_off_press_as_an_input_event_gets_off_once() -> void:
+	Input.parse_input_event(_event(&"whistle"))
+	Input.flush_buffered_events()
+	await wait_physics_frames(3)
+	assert_false(player.is_riding, "The press as an event, through the Riding state, gets off")
+	assert_eq(board.carrier_peer, player.get_multiplayer_authority(), "with the board in hand")
+	await wait_physics_frames(2)
+	assert_false(player.is_riding, "and the same press does not get straight back on")

@@ -183,6 +183,7 @@ var _carry_bone: int = -1
 var _leave_in_hand: bool = false ## Set by the get-off action, so [method dismount] carries the board rather than leaving it.
 var _last_rider_peer: int = 0 ## Who rode last: the same rider keeps their run's score across walking.
 var _pending_pop: float = 0.0 ## Upward speed the next mount adds, for a jump onto the board from foot.
+var _got_off_frame: int = -1 ## The frame the get-off press came in, so the same press cannot also get back on.
 var blocks_hands: bool = false ## Riding a board leaves the hands free (rideable contract).
 var input_type: int = Controls.InputType.KEYBOARD_MOUSE ## Kept equal to the Player's input device by the Riding state.
 var state: State = State.GROUND ## Which of THUG's states the skater is in.
@@ -468,6 +469,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not _carrier.is_multiplayer_authority() or _carrier.is_riding or _carrier.get("is_typing") == true:
 		return
+	if Engine.get_process_frames() == _got_off_frame:
+		return
 	var on_pad: bool = _carrier.controls != null and _carrier.controls.current_input_type != Controls.InputType.KEYBOARD_MOUSE
 	var toggle: StringName = pad_dismount_action if on_pad else keyboard_dismount_action
 	if event.is_action_pressed(toggle):
@@ -497,6 +500,7 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 	# Get off, board in hand (THUG's L1 + R1); the same action on foot gets back on
 	if event.is_action_pressed(_action(keyboard_dismount_action, pad_dismount_action)):
 		_leave_in_hand = true
+		_got_off_frame = Engine.get_process_frames() # the same press reaches _unhandled_input too; it must not get straight back on
 		player.dismount()
 		return
 	if _bail_timer > 0.0:

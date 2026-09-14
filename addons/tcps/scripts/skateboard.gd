@@ -34,7 +34,7 @@ enum State { GROUND, AIR, RAIL, LIP, WALL } ## LIP is a stall on a coping, WALL 
 
 @export_category("Skateboarding Controls")
 @export_group("Keyboard/Mouse Actions")
-@export var keyboard_dismount_action: StringName = &"whistle"
+@export var keyboard_dismount_action: StringName = &"whistle" ## Gets off with the board in hand (THUG's L1 + R1); on foot the same action gets back on, in the air too.
 @export var keyboard_jump_action: StringName = &"jump"
 @export var keyboard_grind_action: StringName = &"action"
 @export var keyboard_flip_action: StringName = &"attack"
@@ -168,10 +168,21 @@ const MANUAL_TILT: float = deg_to_rad(25.0) ## How far the model pitches at the 
 const MIN_AIR_TIME: float = 0.1 ## Shorter hops are contact flicker on a steep transition, not a landing to turn for.
 const DISPLAY_NORMAL_SPEED: float = 14.0 ## Per-second rate the display normal drifts to the floor normal, smoothing a ramp's facets (THUG's adjust_normal).
 const SPECIAL_LIT_COLOUR: Color = Color(1.0, 0.85, 0.3) ## The meter's tint while lit.
+const ACID_DROP_JUMP_VELOCITY: float = 400.0 * INCH ## acid_drop_jump_velocity: a spine button on foot jumps this hard onto the board, to drop into a ramp ahead.
+const CARRY_BONE: String = "RightHand" ## The skater carries the board by this bone of their skeleton while walking.
+const CARRY_OFFSET: Transform3D = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0.0, -0.05, 0.1)) ## Where the board hangs from that bone: deck down along the arm.
+const CARRY_FALLBACK: Transform3D = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0.3, 0.9, 0.0)) ## At the hip when the model has no such bone.
 const SERVER_PEER: int = 1
 
 var player: Player ## The rider, or the Player looking at the board.
 var rider_peer: int = 0 ## The peer whose Player is on the board, 0 when it is free; replicated, and set on every peer by the hand-off.
+var carrier_peer: int = 0 ## The peer whose Player is walking with the board in hand, 0 when nobody is; replicated the same way.
+var _carrier: Player ## That peer's Player in this tree, while [member carrier_peer] is set.
+var _carry_skeleton: Skeleton3D ## Its skeleton, found once.
+var _carry_bone: int = -1
+var _leave_in_hand: bool = false ## Set by the get-off action, so [method dismount] carries the board rather than leaving it.
+var _last_rider_peer: int = 0 ## Who rode last: the same rider keeps their run's score across walking.
+var _pending_pop: float = 0.0 ## Upward speed the next mount adds, for a jump onto the board from foot.
 var blocks_hands: bool = false ## Riding a board leaves the hands free (rideable contract).
 var input_type: int = Controls.InputType.KEYBOARD_MOUSE ## Kept equal to the Player's input device by the Riding state.
 var state: State = State.GROUND ## Which of THUG's states the skater is in.
@@ -301,10 +312,14 @@ func mount(_player: Player) -> void:
 	player.floor_block_on_wall = false # brushing the vert above the arc must not zero the speed the way a wall does on foot
 	player.floor_constant_speed = false # speed is along the surface already; no slope compensation on top
 	player.model_pitch_pivot_height = 0.0 # lean from the feet, not the hips
-	var vertical_speed: float = minf(player.velocity.dot(player.up_direction), 0.0)
+	var vertical_speed: float = minf(player.velocity.dot(player.up_direction), 0.0) + _pending_pop
 	player.velocity = player.velocity.slide(player.up_direction) + (player.up_direction * vertical_speed)
-	_was_on_floor = player.is_on_floor()
+	_was_on_floor = player.is_on_floor() and _pending_pop <= 0.0
 	state = State.GROUND if _was_on_floor else State.AIR
+	if _pending_pop > 0.0:
+		_ollie_grace = OLLIE_GRACE # off the ground this tick: the floor is ignored for a moment so the pop is not stolen
+		_last_jump_at = _clock
+	_pending_pop = 0.0
 	_sfx_was_on_floor = _was_on_floor
 	last_floor_normal = player.up_direction
 	display_normal = player.get_floor_normal() if player.is_on_floor() else player.up_direction
@@ -315,7 +330,9 @@ func mount(_player: Player) -> void:
 	_tense_since = -1.0
 	_bail_timer = 0.0
 	_end_trick(false)
-	tricks = SkateTricks.new()
+	if _last_rider_peer != player.get_multiplayer_authority():
+		tricks = SkateTricks.new() # a new rider starts a new run; the same one keeps the score across walking
+	_last_rider_peer = player.get_multiplayer_authority()
 	air_trick = ""
 	_spin_tally = 0.0
 	_landed_from_vert_at = -1.0
@@ -324,14 +341,24 @@ func mount(_player: Player) -> void:
 	camera.begin(player, self)
 
 
-## Rideable contract: the Player gets off. The board is left where they stand, back under the parent it stood
-## under, the server has it again and the view returns to them. Only the rider gets off it: a refused Player
-## leaving the Riding state must not hand somebody else's board back.
+## Rideable contract: the Player gets off. With the get-off action the board goes into their hand (THUG's
+## skater walks with it) and the combo is banked; otherwise it is left where they stand, back under the parent it
+## stood under, with the server having it again. Either way the view returns to them. Only the rider gets off it:
+## a refused Player leaving the Riding state must not hand somebody else's board back.
 func dismount(_player: Player) -> void:
 	if rider_peer != 0 and rider_peer != _player.get_multiplayer_authority():
 		return
 	stop_all_roll_sounds()
 	_end_trick(false)
+	if not tricks.combo.is_empty():
+		if _bail_timer > 0.0:
+			tricks.bail()
+			combo_lost.emit()
+		else:
+			combo_banked.emit(tricks.land_clean())
+	_reset_board()
+	_transferring = false
+	_wallplant_timer = 0.0
 	rail = null
 	state = State.GROUND
 	camera.end()
@@ -343,38 +370,43 @@ func dismount(_player: Player) -> void:
 	player.model_pitch_pivot_height = _saved_pivot_height
 	player.model_pitch = 0.0
 	var drop: Transform3D = Transform3D(Basis(player.up_direction, player.orientation.basis.get_euler().y), player.global_position)
-	_hand_to(0)
-	global_transform = drop # kept through the reparent home, whenever the server's word for it lands
+	if _leave_in_hand:
+		_leave_in_hand = false
+		_hand_to(player.get_multiplayer_authority(), true)
+	else:
+		_hand_to(0)
+		global_transform = drop # kept through the reparent home, whenever the server's word for it lands
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
 	player = null
+	_refresh_hud() # nobody's now: the combo line, the score and the special meter go
 
 
 # --- Network ------------------------------------------------------------------------------------------------------
 
-## Puts the board under [param peer_id]'s rider on every peer and hands it (and so its synchronizer) to that peer,
-## or, for 0, back where it stood and to the server. The server does both, in that order, so the rider's copy
-## starts sending its place only once every peer has the board under their feet; a client asks the server for it
-## and, when giving it back, goes quiet first. Offline there is nobody to ask.
-func _hand_to(peer_id: int) -> void:
+## Puts the board under [param peer_id]'s rider (or, [param carried], in their hand) on every peer and hands it
+## (and so its synchronizer) to that peer, or, for 0, back where it stood and to the server. The server does both,
+## in that order, so the rider's copy starts sending its place only once every peer has the board under their
+## feet; a client asks the server for it and, when giving it back, goes quiet first. Offline there is nobody to ask.
+func _hand_to(peer_id: int, carried: bool = false) -> void:
 	var authority: int = peer_id if peer_id != 0 else SERVER_PEER
 	if multiplayer.get_peers().is_empty():
-		_ride_by(peer_id)
+		_ride_by(peer_id, carried)
 		set_multiplayer_authority(authority)
 	elif multiplayer.is_server():
-		_ride_by.rpc(peer_id)
+		_ride_by.rpc(peer_id, carried)
 		_set_authority.rpc(authority)
 	else:
 		if peer_id == 0:
 			set_multiplayer_authority(SERVER_PEER)
-		_grant.rpc_id(SERVER_PEER, peer_id)
+		_grant.rpc_id(SERVER_PEER, peer_id, carried)
 
 
 ## A client's request for the hand-off; the server alone answers it.
 @rpc("any_peer", "reliable")
-func _grant(peer_id: int) -> void:
+func _grant(peer_id: int, carried: bool = false) -> void:
 	if multiplayer.is_server():
-		_hand_to(peer_id)
+		_hand_to(peer_id, carried)
 
 
 @rpc("any_peer", "call_local", "reliable")
@@ -383,11 +415,16 @@ func _set_authority(peer_id: int) -> void:
 
 
 ## Puts this copy under the feet of [param peer_id]'s Player (the one in this branch of the tree, since a test can
-## run two), or back under [member _home] for 0; runs on every peer so the board shows under the rider everywhere.
-## The pickup area is off while ridden, so nobody is offered a board that is under somebody's feet.
+## run two), or in their hand when [param carried], or back under [member _home] for 0; runs on every peer so the
+## board shows under the rider (or in the walker's hand) everywhere. The pickup area is off while ridden or
+## carried, so nobody is offered a board that is under somebody's feet or in their hand.
 @rpc("any_peer", "call_local", "reliable")
-func _ride_by(peer_id: int) -> void:
-	rider_peer = peer_id
+func _ride_by(peer_id: int, carried: bool = false) -> void:
+	rider_peer = 0 if carried else peer_id
+	carrier_peer = peer_id if carried else 0
+	_carrier = null
+	_carry_skeleton = null
+	_carry_bone = -1
 	area.collision_layer = _area_layer if peer_id == 0 else 0
 	if peer_id == 0:
 		reparent(_home if is_instance_valid(_home) else get_tree().root)
@@ -396,12 +433,57 @@ func _ride_by(peer_id: int) -> void:
 		if node is Player and node.get_multiplayer_authority() == peer_id and node.multiplayer == multiplayer:
 			reparent((node as Player).player_model, false)
 			transform = Transform3D.IDENTITY
+			if carried:
+				_carrier = node as Player
+				_follow_hand()
+			return
+
+
+## Puts the board in the carrier's hand: on the [constant CARRY_BONE] of their model's skeleton, or at the hip of
+## a model without one. Runs every physics tick on every peer while the board is carried.
+func _follow_hand() -> void:
+	if _carrier == null or not is_instance_valid(_carrier):
+		return
+	if _carry_skeleton == null:
+		var found: Array[Node] = _carrier.player_model.find_children("*", "Skeleton3D", true, false)
+		if not found.is_empty():
+			_carry_skeleton = found[0] as Skeleton3D
+			_carry_bone = _carry_skeleton.find_bone(CARRY_BONE)
+	if _carry_skeleton == null or _carry_bone < 0:
+		transform = CARRY_FALLBACK
+		return
+	global_transform = _carry_skeleton.global_transform * _carry_skeleton.get_bone_global_pose(_carry_bone) * CARRY_OFFSET
+
+
+func _physics_process(_delta: float) -> void:
+	if carrier_peer != 0:
+		_follow_hand()
+
+
+## On foot with the board in hand (the carrier's own peer only): the get-off action gets back on, on the ground or
+## in the air (THUG's skater lands on the board), and a spine button jumps onto it for an acid drop into a ramp
+## ahead (CWalkComponent::maybe_jump_to_acid_drop) or, in the air, drops in from there.
+func _unhandled_input(event: InputEvent) -> void:
+	if carrier_peer == 0 or _carrier == null or not is_instance_valid(_carrier) or event.is_echo():
+		return
+	if not _carrier.is_multiplayer_authority() or _carrier.is_riding or _carrier.get("is_typing") == true:
+		return
+	var on_pad: bool = _carrier.controls != null and _carrier.controls.current_input_type != Controls.InputType.KEYBOARD_MOUSE
+	var toggle: StringName = pad_dismount_action if on_pad else keyboard_dismount_action
+	if event.is_action_pressed(toggle):
+		_carrier.mount(self)
+		return
+	for spine: StringName in (pad_revert_actions if on_pad else keyboard_revert_actions):
+		if event.is_action_pressed(spine):
+			if _carrier.is_on_floor():
+				_pending_pop = ACID_DROP_JUMP_VELOCITY
+			_carrier.mount(self)
 			return
 
 
 ## A rider who drops out takes the board with them; every peer puts it back where it stood and hands it to the server.
 func _on_peer_disconnected(peer_id: int) -> void:
-	if peer_id != 0 and peer_id == rider_peer:
+	if peer_id != 0 and (peer_id == rider_peer or peer_id == carrier_peer):
 		_ride_by(0)
 		set_multiplayer_authority(SERVER_PEER)
 
@@ -412,8 +494,9 @@ func _on_peer_disconnected(peer_id: int) -> void:
 func ride_input(_player: Player, event: InputEvent) -> void:
 	if event.is_echo():
 		return
-	# Dismount
+	# Get off, board in hand (THUG's L1 + R1); the same action on foot gets back on
 	if event.is_action_pressed(_action(keyboard_dismount_action, pad_dismount_action)):
+		_leave_in_hand = true
 		player.dismount()
 		return
 	if _bail_timer > 0.0:
@@ -1538,7 +1621,7 @@ func get_contextual_controls(input_type_: int) -> Dictionary:
 		"joypad_button_1": "Grab / Push",
 		"joypad_axis_4_plus": "Revert / Transfer",
 		"joypad_axis_5_plus": "Revert / Transfer",
-		"key_k" if input_type_ == Controls.InputType.KEYBOARD_MOUSE else "joypad_button_12": "Dismount",
+		"key_k" if input_type_ == Controls.InputType.KEYBOARD_MOUSE else "joypad_button_12": "Walk",
 	}
 
 

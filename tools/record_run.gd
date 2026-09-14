@@ -74,6 +74,8 @@ class Driver extends Node:
 		{"to": Vector3(6, 0, 18), "kind": "point"}, # north, west of the bench, to turn east onto the wall's line
 		{"to": Vector3(28, 0, 25), "kind": "air", "ollie_at_x": 17.5, "wallplant": true}, # pop about 22, Ollie again at the wall
 		{"to": Vector3(10, 0, 25), "kind": "point"},
+		{"to": Vector3(0, 0, 25), "kind": "walk"}, # get off with the board in hand, walk, jump, and get back on in the air
+		{"to": Vector3(-8, 0, 22), "kind": "point"},
 	]
 	const REACH: float = 1.5
 
@@ -105,7 +107,7 @@ class Driver extends Node:
 				leg = int(first)
 				var at: Vector3 = LEGS[leg - 1]["to"]
 				_player.warp_to(Transform3D(Basis(), Vector3(at.x, 0.1, at.z)))
-		if _trace:
+		if _trace and _player.riding is Skateboard:
 			var b: Skateboard = _player.riding as Skateboard
 			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion])
 		if leg >= LEGS.size():
@@ -125,6 +127,27 @@ class Driver extends Node:
 		var flat: Vector3 = (to - here).slide(Vector3.UP)
 		var kind: String = spec["kind"]
 		var done: bool = false
+		if kind == "walk":
+			# Off the board (the dismount action), a second's walk holding forward, a jump, and the same action in
+			# the air to land back on the board; the leg is over once the skater is riding and down again
+			if _leg_time < 0.1:
+				_release_all()
+			elif _leg_time < 0.3 and _player.is_riding and not _ollied:
+				_ollied = true
+				_send(&"whistle", true)
+				_send(&"whistle", false)
+			elif not _player.is_riding and _leg_time < 1.6:
+				Input.action_press(&"move_up")
+			elif not _player.is_riding and not _tricked:
+				_tricked = true
+				Input.action_release(&"move_up")
+				_send(&"jump", true)
+				_send(&"jump", false)
+				get_tree().create_timer(0.35, false, true).timeout.connect(_send.bind(&"whistle", true))
+				get_tree().create_timer(0.4, false, true).timeout.connect(_send.bind(&"whistle", false))
+			if _tricked and _player.is_riding and on_floor and _leg_time > 2.5 or _leg_time > 8.0:
+				_next_leg()
+			return
 		if kind == "point":
 			done = flat.length() < REACH or _leg_time > 12.0
 		else:
@@ -142,7 +165,7 @@ class Driver extends Node:
 		var angle: float = heading.signed_angle_to(flat.normalized(), Vector3.UP)
 		var in_air: bool = not on_floor
 		var riding: Skateboard = _player.riding as Skateboard
-		var on_transition: bool = on_floor and (_player.get_floor_normal().y < 0.7 or riding.last_floor_normal.y < 0.7)
+		var on_transition: bool = on_floor and (_player.get_floor_normal().y < 0.7 or (riding != null and riding.last_floor_normal.y < 0.7))
 		var sharp: bool = on_floor and not on_transition and absf(angle) > deg_to_rad(45.0)
 		if on_transition or in_air or sharp:
 			Input.action_release(&"move_up")
@@ -154,7 +177,7 @@ class Driver extends Node:
 			Input.action_press(&"move_down")
 		else:
 			Input.action_release(&"move_down")
-		if in_air and spec.has("spin"):
+		if in_air and spec.has("spin") and _player.riding is Skateboard:
 			var b: Skateboard = _player.riding as Skateboard
 			if absf(b._spin_tally) < 150.0:
 				_press_turn(spec["spin"]) # up to a half turn and a bit, inside the slop of the 180
@@ -195,6 +218,8 @@ class Driver extends Node:
 			_tap(&"jump")
 			_ollied = true
 		var board: Skateboard = _player.riding as Skateboard
+		if board == null:
+			return
 		# A lip: Grind while rising in vert air; once on the coping, let go, hold the stall a second and pop off
 		if spec.has("lip"):
 			if in_air and board.vert_normal != Vector3.ZERO and _player.velocity.y > 0.0 and board.state == Skateboard.State.AIR and not _tricked:
@@ -261,5 +286,5 @@ class Driver extends Node:
 
 	func _release_all() -> void:
 		Input.action_release(&"focus")
-		for action: StringName in [&"move_up", &"move_down", &"move_left", &"move_right", &"jump", &"sprint", &"action"]:
+		for action: StringName in [&"move_up", &"move_down", &"move_left", &"move_right", &"jump", &"sprint", &"action", &"whistle"]:
 			Input.action_release(action)

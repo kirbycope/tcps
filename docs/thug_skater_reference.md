@@ -489,6 +489,17 @@ it is fed `scorePot * mult - m_recentSpecialScorePot` every time the combo grows
 active; `>= 3000` sets active, active until it reaches 0; `Bail()` zeroes it. `CSkater::GetStat` `:588` adds 3 to
 every stat while active, and `CTrickComponent` `:2152` checks the special tricks array only then.
 
+## 9c. Walking (`Code/Gel/Components/WalkComponent.cpp`, `walking_control.q`, `switch_control.q`)
+
+Getting off and on is `SwitchControl_Trigger` (`PressTwoAnyOrder L1 R1 400`; Xbox Black, GC Z), queued as
+`SkateToWalkTricks` on the ground and in the air. On foot the skater carries the board (`IsBoardMissing` is only
+for levels that take it away). Back onto the board from the air is the normal landing; `maybe_in_air_acid_drop`
+`:2455` and `maybe_jump_to_acid_drop` `:2480` take the spine buttons (`WALK_SPINE_BUTTONS`) in the air or on the
+ground, the latter jumping with `acid_drop_jump_velocity` (400 in/s) first, both through the skater's own
+`maybe_acid_drop` with the walking flag (a 100 in scan on the ground, 200 in of scan height, `SkateInAble_*`
+offsets for rails and lips). Walk speeds: `max_slow_walk_speed` 120, `max_fast_walk_speed` 250,
+`max_slow_run_speed` 500 in/s; `vert_wall_jump_speed` 600.
+
 ## 10. What a rewrite must copy, ranked
 
 1. **Velocity is rotated, never projected, through ground transitions**: `RotateToPlane` at the top of every

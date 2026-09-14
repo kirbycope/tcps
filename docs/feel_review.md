@@ -149,3 +149,9 @@ does: a spin multiplies the trick it is on, a trick repeated in the run deprecia
 earns nothing, and the special meter fills as the combo grows, lights at three thousand, lifts every stat by three
 and opens the created skater's three special tricks. Nothing in the scoring is a guess any more; what is left of
 THUG's skater is skitching, walking, and the rest of its trick list.
+
+## Walking
+
+THUG's get-off button now leaves the board in the skater's hand, banks the combo and keeps the run's score, and
+the same button gets back on anywhere, the air included; a spine button on foot jumps onto the board for an acid
+drop. The walking is the Player's own. What is left of THUG's skater is skitching and the rest of its trick list.

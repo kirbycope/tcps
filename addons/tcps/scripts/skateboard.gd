@@ -475,12 +475,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	var toggle: StringName = pad_dismount_action if on_pad else keyboard_dismount_action
 	if event.is_action_pressed(toggle):
 		_carrier.mount(self)
+		get_viewport().set_input_as_handled() # the press got on the board; the Player's own whistle must not also summon a horse
 		return
 	for spine: StringName in (pad_revert_actions if on_pad else keyboard_revert_actions):
 		if event.is_action_pressed(spine):
 			if _carrier.is_on_floor():
 				_pending_pop = ACID_DROP_JUMP_VELOCITY
 			_carrier.mount(self)
+			get_viewport().set_input_as_handled()
 			return
 
 

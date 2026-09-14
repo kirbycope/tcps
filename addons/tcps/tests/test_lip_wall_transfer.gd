@@ -51,7 +51,7 @@ func _vert_air_on_the_quarter_pipe(height: float, rise: float) -> void:
 func test_the_park_has_copings_a_spine_a_bank_and_a_ridable_wall() -> void:
 	for path: String in ["HalfPipe/LeftCopingRail", "HalfPipe/RightCopingRail", "QuarterPipeCoping", "SpineNearCoping", "SpineFarCoping"]:
 		assert_true(park.get_node(path) is Rail, path + " is a rail")
-	assert_almost_eq((park.get_node("QuarterPipeCoping") as Rail).point_at(4.0), Vector3(-18.0, 3.3, 4.0), Vector3.ONE * 0.01, "The quarter pipe's coping is along its lip")
+	assert_almost_eq((park.get_node("QuarterPipeCoping") as Rail).point_at(12.0), Vector3(-18.0, 3.3, 4.0), Vector3.ONE * 0.01, "The quarter pipe's coping is along its lip (16 m of it, from z = -8)")
 	assert_true(park.get_node("Spine").is_in_group("WOOD"), "The spine is wood")
 	assert_true(park.get_node("Bank").is_in_group("WOOD"), "and so is the bank up to the quarter pipe's deck")
 	assert_true(park.get_node("Wall").is_in_group("wallride"), "The wall can be ridden")

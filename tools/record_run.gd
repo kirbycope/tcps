@@ -51,7 +51,7 @@ class Driver extends Node:
 		{"to": Vector3(2, 0, 6), "kind": "point", "manual_at_x": -6.0}, # a manual across the flat
 		{"to": Vector3(17, 0, 6), "kind": "point", "ollie_at_x": 9.5, "flip": true}, # a kickflip over the funbox
 		{"to": Vector3(20, 0, 25), "kind": "point"},
-		{"to": Vector3(28, 0, 25), "kind": "point"}, # into the wall, head on
+		{"to": Vector3(28, 0, 25), "kind": "bonk"}, # into the wall, head on; the leg is over at the bonk
 		{"to": Vector3(0, 0, -10), "kind": "point"}, # into the half pipe's flat
 		{"to": Vector3(-9, 0, -10), "kind": "air"}, # left wall
 		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true, "flip_direction": Vector2(-1.0, -1.0), "double": true}, # right wall, pop at the lip, a varial kickflip (Down-Left) in the air, flipped again into a 360 Flip
@@ -203,6 +203,8 @@ class Driver extends Node:
 			return
 		if kind == "point":
 			done = flat.length() < REACH or _leg_time > 12.0
+		elif kind == "bonk":
+			done = (_leg_time > 0.5 and _player.is_on_wall()) or _leg_time > 6.0
 		else:
 			var tricked: bool = _tricked or not (spec.has("acid") or spec.has("spine") or spec.has("lip"))
 			done = (landed and _leg_time > 0.5 and tricked) or _leg_time > 14.0
@@ -355,6 +357,7 @@ class Driver extends Node:
 		print("record_run: leg %d done at %.1f s, at %s" % [leg, elapsed, _player.global_position])
 		leg += 1
 		_leg_time = 0.0
+		_hold_until = 0.0
 		_left_ground = false
 		_ollied = false
 		_manualled = false

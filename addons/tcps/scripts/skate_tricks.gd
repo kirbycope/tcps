@@ -10,35 +10,87 @@ extends RefCounted
 ## The special meter fills as the combo grows, lights at [constant SPECIAL_FULL], drains all the while, and lit it
 ## adds three to every stat and opens the special tricks.
 
-# The points are THUG's own, from its trick scripts.
+# The points are THUG's own, from its trick scripts, and the tables are the created skater's default mapping
+# (CustomTricks_default in protricks.q, with HawkLip for the lips, and GrindTrickList): eight directions, the
+# diagonals THUG's d-pad gives when two directions are held. A button with nothing held does the Left slot's
+# trick, as THPS has always done; THUG has no slot for it.
 const FLIPS: Dictionary = { ## Square in THUG. Direction held at the press, then the name and the points.
 	"": ["Kickflip", 100],
-	"left": ["Heelflip", 100],
-	"right": ["Pop Shove-It", 100],
+	"left": ["Kickflip", 100],
+	"right": ["Heelflip", 100],
 	"up": ["Impossible", 100],
-	"down": ["Hardflip", 300],
+	"down": ["Pop Shove-It", 100],
+	"up_left": ["Hardflip", 300],
+	"up_right": ["Inward Heelflip", 350],
+	"down_left": ["Varial Kickflip", 300],
+	"down_right": ["Varial Heelflip", 300],
 }
 const GRABS: Dictionary = { ## Circle in THUG.
 	"": ["Melon", 300],
-	"left": ["Indy", 300],
-	"right": ["Stalefish", 350],
+	"left": ["Melon", 300],
+	"right": ["Indy", 300],
 	"up": ["Nosegrab", 300],
 	"down": ["Tailgrab", 300],
+	"up_left": ["Japan", 350],
+	"up_right": ["Madonna", 750],
+	"down_left": ["Benihana", 300],
+	"down_right": ["Airwalk", 450],
 }
-const GRINDS: Dictionary = { ## Triangle in THUG, by the direction held when the rail is taken.
+const GRINDS: Dictionary = { ## Triangle in THUG, by the direction held when a rail is taken along the travel (GrindTrickList's parallel entries).
 	"": ["50-50", 100],
-	"left": ["Boardslide", 200],
-	"right": ["Lipslide", 200],
+	"left": ["Tailslide", 150],
+	"right": ["Noseslide", 150],
 	"up": ["Nosegrind", 100],
 	"down": ["5-0", 100],
+	"up_left": ["Overcrook", 125],
+	"up_right": ["Crooked", 125],
+	"down_left": ["Smith", 125],
+	"down_right": ["Feeble", 125],
+}
+const ACROSS_GRINDS: Dictionary = { ## The same, for a rail taken across the travel: the slides (GrindTrickList's other entries).
+	"": ["Boardslide", 200],
+	"left": ["Boardslide", 200],
+	"right": ["Lipslide", 200],
 }
 const MANUALS: Dictionary = {"manual": ["Manual", 100], "nose_manual": ["Nose Manual", 100]}
-const LIPS: Dictionary = { ## Grind at the lip of a vert wall on the way up, by the direction held.
-	"": ["Axle Stall", 400],
-	"left": ["Disaster", 600],
-	"right": ["Blunt To Fakie", 500],
-	"up": ["Rock To Fakie", 500],
-	"down": ["Nose Stall", 300],
+const LIPS: Dictionary = { ## Grind at the lip of a vert wall on the way up, by the direction held (HawkLip; DefaultLipTrick with nothing held).
+	"": ["Nose Stall", 300],
+	"left": ["Varial Invert To Fakie", 450],
+	"right": ["BS Boneless", 550],
+	"up": ["FS Noseblunt", 550],
+	"down": ["Invert", 500],
+	"up_left": ["Andrecht Invert", 550],
+	"up_right": ["The Switcheroo", 600],
+	"down_left": ["Gymnast Plant", 575],
+	"down_right": ["One Foot Invert", 500],
+}
+const EXTRAS: Dictionary = { ## ExtraTricks: the button pressed again mid-trick turns the trick into this one (and again, into that one's).
+	"Kickflip": ["Double Kickflip", 500],
+	"Double Kickflip": ["Triple Kickflip", 1000],
+	"Heelflip": ["Double Heelflip", 500],
+	"Double Heelflip": ["Triple Heelflip", 1000],
+	"Pop Shove-It": ["360 Shove-It", 500],
+	"360 Shove-It": ["540 Shove-It", 1000],
+	"Impossible": ["Double Impossible", 500],
+	"Double Impossible": ["Triple Impossible", 1000],
+	"Hardflip": ["360 Hardflip", 500],
+	"Varial Kickflip": ["360 Flip", 550],
+	"Varial Heelflip": ["360 Heelflip", 500],
+	"Inward Heelflip": ["360 Inward Heelflip", 500],
+	"Sal Flip": ["360 Sal Flip", 1150],
+	"Ollie North": ["Ollie North Back Foot Flip", 1050],
+	"Melon": ["Method", 400],
+	"Indy": ["Stiffy", 500],
+	"Nosegrab": ["Rocket Air", 400],
+	"Tailgrab": ["One Foot Tailgrab", 500],
+	"Japan": ["One Foot Japan", 800],
+	"Madonna": ["Judo", 1150],
+	"Benihana": ["Sacktap", 1500],
+	"Airwalk": ["Christ Air", 550],
+}
+const DOUBLE_TAPS: Dictionary = { ## Two taps of one direction then the button (Air_U_U_Square, GrindTricks): these instead of the direction's trick.
+	"flip": {"up,up": ["Sal Flip", 900], "down,down": ["Ollie North", 169]},
+	"grind": {"up,up": ["Nosebluntslide", 250], "down,down": ["Bluntslide", 250]},
 }
 const OLLIE: Array = ["Ollie", 75] ## What a spin with no trick in the air attaches to.
 const WALLRIDE: Array = ["Wallride", 200]
@@ -81,15 +133,34 @@ static func named(table: Dictionary, direction: String) -> Array:
 	return table.get(direction, table[""])
 
 
-## The direction name THUG's d-pad would give for a stick reading, or "" for centred.
+## The direction name THUG's d-pad would give for a stick reading ("up_left" and the other diagonals when both
+## are held), or "" for centred.
 static func direction_of(motion: Vector2) -> String:
-	if absf(motion.x) > absf(motion.y):
-		return "left" if motion.x < 0.0 else "right"
-	if motion.y > 0.0:
-		return "up"
-	if motion.y < 0.0:
-		return "down"
-	return ""
+	var vertical: String = "up" if motion.y > 0.0 else ("down" if motion.y < 0.0 else "")
+	var horizontal: String = "left" if motion.x < 0.0 else ("right" if motion.x > 0.0 else "")
+	if vertical != "" and horizontal != "":
+		return vertical + "_" + horizontal
+	return vertical + horizontal
+
+
+## The extra a repeated press turns [param trick_name] into, as [name, points], or empty when it has none.
+static func extra_for(trick_name: String) -> Array:
+	return EXTRAS.get(trick_name, [])
+
+
+## The double-tap trick for [param kind] ("flip" or "grind") after [param taps] (the last two directions tapped,
+## oldest first), as [name, points], or empty.
+static func double_tap(kind: String, taps: Array) -> Array:
+	if taps.size() != 2 or not DOUBLE_TAPS.has(kind):
+		return []
+	return DOUBLE_TAPS[kind].get(",".join(PackedStringArray([str(taps[0]), str(taps[1])])), [])
+
+
+## The grind for [param direction] held when a rail is taken, [param across] the travel or along it.
+static func named_grind(direction: String, across: bool) -> Array:
+	if across and ACROSS_GRINDS.has(direction):
+		return ACROSS_GRINDS[direction]
+	return named(GRINDS, direction)
 
 
 ## The spin a landing counts, in degrees, from the yaw turned in the air: to the nearest half turn, or the next one
@@ -126,6 +197,22 @@ func add(name: String, points: int) -> void:
 	var uses: int = int(_history.get(name, 0)) + int(_combo_uses.get(name, 0))
 	_combo_uses[name] = int(_combo_uses.get(name, 0)) + 1
 	combo.append({"name": name, "points": points, "spin": 0, "spin_text": "", "uses": uses})
+	_feed_special()
+
+
+## Turns the combo's last trick into [param name] worth [param points] (an extra: a Kickflip into a Double
+## Kickflip), keeping its spin; the uses count moves to the new name.
+func upgrade_last(name: String, points: int) -> void:
+	if combo.is_empty():
+		add(name, points)
+		return
+	var entry: Dictionary = combo.back()
+	var old: String = entry["name"]
+	_combo_uses[old] = maxi(int(_combo_uses.get(old, 0)) - 1, 0)
+	entry["uses"] = int(_history.get(name, 0)) + int(_combo_uses.get(name, 0))
+	_combo_uses[name] = int(_combo_uses.get(name, 0)) + 1
+	entry["name"] = name
+	entry["points"] = points
 	_feed_special()
 
 

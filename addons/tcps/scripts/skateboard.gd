@@ -203,6 +203,7 @@ var tricks: SkateTricks = SkateTricks.new() ## The combo and the score.
 var air_trick: String = "" ## The flip or grab in progress in the air, or "".
 var _air_trick_kind: String = "" ## "flip" or "grab".
 var _air_trick_time: float = 0.0 ## Seconds the air trick has run.
+var _air_trick_animation: String = "" ## The board animation of the air trick's base, replayed for its extras.
 var _spin_tally: float = 0.0 ## Degrees of yaw turned in this air.
 var _landed_from_vert_at: float = -1.0 ## When the last vert landing was, for the revert window; -1 when none.
 var _bank_timer: float = 0.0 ## Counting down since a landing with a combo waiting to be banked.
@@ -533,15 +534,24 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 			jump_requested.emit()
 			_ollie(held)
 
-	# Flip and grab tricks in the air, named by the direction held (THUG's Square and Circle)
-	if state == State.AIR and air_trick == "":
+	# Flip and grab tricks in the air, named by the direction held (THUG's Square and Circle): a special after its
+	# two taps with the meter lit, a double-tap trick after its two, the direction's trick otherwise; the same
+	# button again mid-trick is the extra (a Double Kickflip, a Method)
+	if state == State.AIR:
 		var direction: String = SkateTricks.direction_of(_digital(player.player_input.motion))
-		if event.is_action_pressed(_action(keyboard_flip_action, pad_flip_action)):
-			var special_flip: Array = tricks.special_trick("flip", _recent_taps())
-			_start_air_trick("flip", special_flip if not special_flip.is_empty() else SkateTricks.named(SkateTricks.FLIPS, direction))
-		elif event.is_action_pressed(_action(keyboard_grab_action, pad_grab_action)):
-			var special_grab: Array = tricks.special_trick("grab", _recent_taps())
-			_start_air_trick("grab", special_grab if not special_grab.is_empty() else SkateTricks.named(SkateTricks.GRABS, direction))
+		var flip_pressed: bool = event.is_action_pressed(_action(keyboard_flip_action, pad_flip_action))
+		var grab_pressed: bool = event.is_action_pressed(_action(keyboard_grab_action, pad_grab_action))
+		if air_trick != "":
+			if (flip_pressed and _air_trick_kind == "flip") or (grab_pressed and _air_trick_kind == "grab"):
+				_extra_air_trick()
+		elif flip_pressed:
+			var flip: Array = tricks.special_trick("flip", _recent_taps())
+			if flip.is_empty():
+				flip = SkateTricks.double_tap("flip", _recent_taps())
+			_start_air_trick("flip", flip if not flip.is_empty() else SkateTricks.named(SkateTricks.FLIPS, direction))
+		elif grab_pressed:
+			var grab: Array = tricks.special_trick("grab", _recent_taps())
+			_start_air_trick("grab", grab if not grab.is_empty() else SkateTricks.named(SkateTricks.GRABS, direction))
 
 	if event.is_action_pressed(_action(keyboard_grind_action, pad_grind_action)):
 		_grind_pressed_at = _now()
@@ -967,7 +977,7 @@ func _try_rail() -> bool:
 	var found: Dictionary = _find_rail()
 	if found.is_empty():
 		return false
-	_got_rail(found["rail"], found["hit"])
+	_got_rail(found["rail"], found["hit"], found["across"])
 	return true
 
 
@@ -976,12 +986,14 @@ func _try_rail() -> bool:
 ## [code]{"rail", "hit"}[/code], or empty.
 func _find_rail() -> Dictionary:
 	var up: Vector3 = player.up_direction
-	var from: Vector3 = _old_position
-	var to: Vector3 = player.global_position
+	# The move this tick is about to make: the search runs before the body moves, so the last tick's move is gone
+	var from: Vector3 = player.global_position
+	var to: Vector3 = from + player.velocity * get_physics_process_delta_time()
 	var move: Vector3 = (to - from).slide(up)
 	var best_rail: Rail = null
 	var best_hit: Dictionary = {}
 	var best_score: float = INF
+	var best_dot: float = 1.0
 	for node: Node in get_tree().get_nodes_in_group("rails"):
 		var candidate: Rail = node as Rail
 		if candidate == null or not candidate.is_inside_tree():
@@ -1001,14 +1013,15 @@ func _find_rail() -> Dictionary:
 			best_score = score
 			best_rail = candidate
 			best_hit = hit
+			best_dot = dot
 	if best_rail == null:
 		return {}
-	return {"rail": best_rail, "hit": best_hit}
+	return {"rail": best_rail, "hit": best_hit, "across": best_dot < 0.5}
 
 
 ## Locks onto [param on] at [param hit] (THUG got_rail): the horizontal speed goes along the rail the way the board
 ## was heading, plus the rail's boost, the skater faces along it, and the grind's balance starts.
-func _got_rail(on: Rail, hit: Dictionary) -> void:
+func _got_rail(on: Rail, hit: Dictionary, across: bool = false) -> void:
 	var up: Vector3 = player.up_direction
 	var direction: Vector3 = hit["direction"]
 	var horizontal: Vector3 = player.velocity.slide(up)
@@ -1034,7 +1047,9 @@ func _got_rail(on: Rail, hit: Dictionary) -> void:
 	_start_trick("grind")
 	var grind: Array = tricks.special_trick("grind", _recent_taps())
 	if grind.is_empty():
-		grind = SkateTricks.named(SkateTricks.GRINDS, SkateTricks.direction_of(_digital(player.player_input.motion)))
+		grind = SkateTricks.double_tap("grind", _recent_taps())
+	if grind.is_empty():
+		grind = SkateTricks.named_grind(SkateTricks.direction_of(_digital(player.player_input.motion)), across)
 	tricks.add(grind[0], grind[1])
 	_bank_timer = 0.0
 
@@ -1570,10 +1585,27 @@ func _start_air_trick(kind: String, named: Array) -> void:
 	_air_trick_kind = kind
 	_air_trick_time = 0.0
 	_air_tricks += 1
+	_air_trick_animation = animation_name_for(named[0])
 	tricks.add(named[0], named[1])
 	_bank_timer = 0.0
 	if kind == "flip":
-		_play_board(animation_name_for(named[0]))
+		_play_board(_air_trick_animation)
+
+
+## The trick's button pressed again while it runs (THUG's ExtraTricks): a flip still turning becomes its extra
+## and turns for another [constant SkateTricks.FLIP_TIME], so a Double Kickflip needs the air for it; a grab
+## becomes its extra as long as it is held. A trick with no extra is left alone.
+func _extra_air_trick() -> void:
+	var extra: Array = SkateTricks.extra_for(air_trick)
+	if extra.is_empty():
+		return
+	if _air_trick_kind == "flip" and _air_trick_time >= SkateTricks.FLIP_TIME:
+		return # the flip was done; the press is too late
+	air_trick = extra[0]
+	tricks.upgrade_last(extra[0], extra[1])
+	if _air_trick_kind == "flip":
+		_air_trick_time = 0.0
+		_play_board(_air_trick_animation) # the base flip's turn again: the mesh has no double of its own
 
 
 ## The board's animation for a trick name: "Pop Shove-It" is "pop_shove_it".

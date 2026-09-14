@@ -71,7 +71,7 @@ func test_grind_rising_past_the_coping_is_a_lip_trick_that_stops_the_skater() ->
 	await wait_physics_frames(3)
 	assert_eq(board.state, Skateboard.State.LIP, "Rising past the coping with Grind held is a lip")
 	assert_eq(board.trick, "lip", "with the lip's balance running")
-	assert_eq(board.tricks.names(), ["Axle Stall"], "and the stall in the combo")
+	assert_eq(board.tricks.names(), ["Nose Stall"], "and the stall in the combo (THUG's DefaultLipTrick with nothing held)")
 	assert_almost_eq(player.velocity, Vector3.ZERO, Vector3.ONE * 0.001, "The skater has stopped dead")
 	assert_almost_eq(player.global_position.y, 3.3, 0.05, "on the coping")
 	var stopped: Vector3 = player.global_position

@@ -162,3 +162,10 @@ THUG's skitch: Up held behind a vehicle's skitch point takes it, the skater is p
 its speed, balances on the gentlest of THUG's meters, and lets go with Down, the meter's end or a pop, rolling
 on. The park has a truck on a loop for it; a gta vehicle needs only the group and a marker. What is left of
 THUG's skater is the rest of its trick list.
+
+## The trick list
+
+The created skater's own slots from THUG's scripts, all eight directions for flips, grabs, grinds and lips, the
+double-tap tricks, the slides for a rail taken across the travel, and the extras a repeated press gives, each
+with THUG's points. The rail search now looks along the move the tick is about to make, which it had never
+really done. THUG's pro skaters' slots and its remaining trick names are the only part of the skater not here.

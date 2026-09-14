@@ -511,6 +511,26 @@ velocity is the contact's `* skitch_speed_match` (1.0) and the skater is moved t
 Blockspin`. Down held, the meter's end (`OffMeterTop/Bottom`) and an ollie all run `SkitchOut`: `StopSkitch`,
 `LandSkaterTricks`, back to `OnGroundAI`, no bail.
 
+## 9e. The trick list (`protricks.q`, `airtricks.q`, `grindlist.q`, `grindscripts.q`, `liptricks.q`)
+
+A skater's mapping is a structure of slots (`Air_SquareL`... `Air_SquareDR`, `Air_CircleL`..., `Air_U_U_Square`,
+`Air_D_D_Square`, a lip set, `JumpSlot`, `ExtraSlot1/2`); the created skater's is `CustomTricks_default` (with
+`HawkLip`): Square L Kickflip 100, R Heelflip 100, U Impossible 100, D Pop Shove-It 100, UL Hardflip 300, UR
+Inward Heelflip 350, DL Varial Kickflip 300, DR Varial Heelflip 300, U,U Sal Flip 900, D,D Ollie North 169;
+Circle L Melon 300, R Indy 300, U Nosegrab 300, D Tailgrab 300, UL Japan 350, UR Madonna 750, DL Benihana 300,
+DR Airwalk 450; lips (HawkLip) L Varial Invert to Fakie 450, R BS Boneless 550, U FS Noseblunt 550, D Invert 500,
+UL Andrecht Invert 550, UR The Switcheroo 600, DL Gymnast Plant 575, DR One Foot Invert 500, none
+`DefaultLipTrick` Nose Stall 300. `GrindTrickList` is nine sub-arrays by direction (none, U, D, L, R, UL, UR, DL,
+DR), each indexed by the approach flags (right, parallel, backwards, regular): none 50-50 100 / Boardslide 200 /
+Lipslide 200, U Nosegrind 100, D 5-0 100, L Tailslide 150 (Boardslide across), R Noseslide 150 (Lipslide
+across), UL Overcrook 125, UR Crooked 125, DL Smith 125, DR Feeble 125; `GrindTricks` U,U Nosebluntslide 250,
+D,D Bluntslide 250. `ExtraTricks` (`Trigger Press Square 300`, `IsExtra`, `UseCurrent`) chain: Kickflip -> Double
+500 -> Triple 1000, Heelflip likewise, Pop Shove-It -> 360 500 -> 540 1000, Impossible -> Double 500 -> Triple
+1000, Hardflip -> 360 Hardflip 500, Varial Kickflip -> 360 Flip 550, Varial Heelflip -> 360 Heelflip 500, Inward
+Heelflip -> 360 Inward Heelflip 500, Sal Flip -> 360 Sal Flip 1150, Ollie North -> Back Foot Flip 1050; Melon ->
+Method 400, Indy -> Stiffy 500, Nosegrab -> Rocket Air 400, Tailgrab -> One Foot Tailgrab 500, Japan -> One Foot
+Japan 800, Madonna -> Judo 1150, Benihana -> Sacktap 1500, Airwalk -> Christ Air 550.
+
 ## 10. What a rewrite must copy, ranked
 
 1. **Velocity is rotated, never projected, through ground transitions**: `RotateToPlane` at the top of every

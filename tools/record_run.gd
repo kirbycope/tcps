@@ -54,7 +54,7 @@ class Driver extends Node:
 		{"to": Vector3(28, 0, 25), "kind": "point"}, # into the wall, head on
 		{"to": Vector3(0, 0, -10), "kind": "point"}, # into the half pipe's flat
 		{"to": Vector3(-9, 0, -10), "kind": "air"}, # left wall
-		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true}, # right wall, pop at the lip
+		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true, "flip_direction": Vector2(-1.0, -1.0), "double": true}, # right wall, pop at the lip, a varial kickflip (Down-Left) in the air, flipped again into a 360 Flip
 		{"to": Vector3(0, 0, 0), "kind": "point", "ollie_at_x": -2.0, "spin": 1.0}, # a flat ollie with a 180 on the way out
 		{"to": Vector3(-8, 0, 4), "kind": "point"}, # line up on the quarter pipe again
 		{"to": Vector3(-22, 0, 4), "kind": "air", "lip": true}, # a lip trick on its coping, then drop back in
@@ -100,6 +100,7 @@ class Driver extends Node:
 	var _started: bool = false
 	var _skitch_since: float = 0.0
 	var _skitch_go: bool = false
+	var _hold_until: float = 0.0 ## Leg time until which a trick's direction is held and the steering keeps its hands off the stick.
 	var _trace: bool = OS.get_environment("TCPS_TRACE") != ""
 
 	func _physics_process(delta: float) -> void:
@@ -121,7 +122,7 @@ class Driver extends Node:
 		if _trace and _player.riding is Skateboard:
 			var b: Skateboard = _player.riding as Skateboard
 			var truck_node: Node3D = park.get_node_or_null("TruckRoute/TruckFollow/Truck") as Node3D
-			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s truck %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion, truck_node.global_position if truck_node else Vector3.ZERO])
+			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s truck %s trick %s combo %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion, truck_node.global_position if truck_node else Vector3.ZERO, b.air_trick, b.tricks.names()])
 		if leg >= LEGS.size():
 			_release_all()
 			finished = true
@@ -225,9 +226,10 @@ class Driver extends Node:
 		else:
 			Input.action_press(&"move_up")
 			Input.action_press(&"sprint")
+		var holding_a_direction: bool = _leg_time < _hold_until # a trick's direction is being held: leave the stick alone
 		if sharp:
 			Input.action_press(&"move_down")
-		else:
+		elif not holding_a_direction:
 			Input.action_release(&"move_down")
 		if in_air and spec.has("spin") and _player.riding is Skateboard:
 			var b: Skateboard = _player.riding as Skateboard
@@ -237,7 +239,7 @@ class Driver extends Node:
 				_release_turn()
 		elif absf(angle) > 0.08 and not in_air:
 			_press_turn(signf(angle))
-		else:
+		elif not holding_a_direction:
 			_release_turn()
 
 		# Ollie where the leg asks for one, holding Grind through the air when it asks for that too
@@ -253,6 +255,27 @@ class Driver extends Node:
 			_tricked = true
 			_send(&"attack", true)
 			get_tree().create_timer(0.1, false, true).timeout.connect(_send.bind(&"attack", false))
+			if spec.get("double", false):
+				get_tree().create_timer(0.2, false, true).timeout.connect(_send.bind(&"attack", true)) # again mid-flip: the extra
+				get_tree().create_timer(0.3, false, true).timeout.connect(_send.bind(&"attack", false))
+		if spec.has("flip_direction") and _ollied and in_air and not _tricked and _left_ground:
+			_tricked = true
+			_hold_until = _leg_time + 0.2
+			var direction: Vector2 = spec["flip_direction"]
+			if direction.x < 0.0:
+				Input.action_press(&"move_left")
+			elif direction.x > 0.0:
+				Input.action_press(&"move_right")
+			if direction.y < 0.0:
+				Input.action_press(&"move_down")
+			elif direction.y > 0.0:
+				Input.action_press(&"move_up")
+			get_tree().create_timer(0.05, false, true).timeout.connect(_send.bind(&"attack", true))
+			get_tree().create_timer(0.15, false, true).timeout.connect(_send.bind(&"attack", false))
+			get_tree().create_timer(0.2, false, true).timeout.connect(_release_all)
+			if spec.get("double", false):
+				get_tree().create_timer(0.3, false, true).timeout.connect(_send.bind(&"attack", true)) # again mid-flip: the extra
+				get_tree().create_timer(0.4, false, true).timeout.connect(_send.bind(&"attack", false))
 		if spec.get("grab", false) and in_air and not _tricked and _left_ground:
 			_tricked = true
 			Input.action_press(&"sprint")
@@ -266,7 +289,7 @@ class Driver extends Node:
 			_send(&"move_up", false)
 			_send(&"move_down", true)
 			_send(&"move_down", false)
-		if spec.get("ollie", false) and not _ollied and on_floor and _player.get_floor_normal().angle_to(Vector3.UP) > deg_to_rad(60.0):
+		if spec.get("ollie", false) and not _ollied and on_floor and _player.get_floor_normal().angle_to(Vector3.UP) > deg_to_rad(60.0) and _player.velocity.y > 2.0:
 			_tap(&"jump")
 			_ollied = true
 		var board: Skateboard = _player.riding as Skateboard

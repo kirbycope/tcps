@@ -231,15 +231,83 @@ tracks/0/keys = {
 "values": [Vector3(0, 0, 0), Vector3(-0.35, 0.4, 0.6), Vector3(0, 3.14159, 6.28319)]
 }
 
+[sub_resource type="Animation" id="Animation_varial_kickflip"]
+resource_name = "varial_kickflip"
+length = 0.45
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Board:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.45),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.35, 0.4, 0.6), Vector3(0, 3.14159, 6.28319)]
+}
+
+[sub_resource type="Animation" id="Animation_varial_heelflip"]
+resource_name = "varial_heelflip"
+length = 0.45
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Board:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.45),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.35, -0.4, -0.6), Vector3(0, -3.14159, -6.28319)]
+}
+
+[sub_resource type="Animation" id="Animation_inward_heelflip"]
+resource_name = "inward_heelflip"
+length = 0.45
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Board:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.45),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.35, 0.4, -0.6), Vector3(0, 3.14159, -6.28319)]
+}
+
+[sub_resource type="Animation" id="Animation_sal_flip"]
+resource_name = "sal_flip"
+length = 0.45
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Board:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.45),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-6.28319, 0, 6.28319)]
+}
+
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_board"]
 _data = {
 &"RESET": SubResource("Animation_RESET"),
 &"hardflip": SubResource("Animation_hardflip"),
 &"heelflip": SubResource("Animation_heelflip"),
 &"impossible": SubResource("Animation_impossible"),
+&"inward_heelflip": SubResource("Animation_inward_heelflip"),
 &"kickflip": SubResource("Animation_kickflip"),
 &"ollie": SubResource("Animation_ollie"),
-&"pop_shove_it": SubResource("Animation_pop_shove_it")
+&"pop_shove_it": SubResource("Animation_pop_shove_it"),
+&"sal_flip": SubResource("Animation_sal_flip"),
+&"varial_heelflip": SubResource("Animation_varial_heelflip"),
+&"varial_kickflip": SubResource("Animation_varial_kickflip")
 }
 
 [node name="Skateboard" type="Node3D" unique_id=1423074470]

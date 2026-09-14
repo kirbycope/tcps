@@ -45,14 +45,27 @@ func _place(at: Vector3, heading: Vector3, speed: float) -> void:
 
 func test_the_tables_name_tricks_by_the_direction_held() -> void:
 	assert_eq(SkateTricks.named(SkateTricks.FLIPS, ""), ["Kickflip", 100])
-	assert_eq(SkateTricks.named(SkateTricks.FLIPS, "left"), ["Heelflip", 100])
+	assert_eq(SkateTricks.named(SkateTricks.FLIPS, "right"), ["Heelflip", 100], "THUG's created skater's slots (CustomTricks_default)")
+	assert_eq(SkateTricks.named(SkateTricks.FLIPS, "up_right"), ["Inward Heelflip", 350], "with the diagonals")
 	assert_eq(SkateTricks.named(SkateTricks.GRABS, "down"), ["Tailgrab", 300], "THUG's own points, from airtricks.q")
+	assert_eq(SkateTricks.named(SkateTricks.GRABS, "up_right"), ["Madonna", 750])
 	assert_eq(SkateTricks.named(SkateTricks.GRINDS, "up"), ["Nosegrind", 100])
-	assert_eq(SkateTricks.named(SkateTricks.LIPS, "left"), ["Disaster", 600])
+	assert_eq(SkateTricks.named_grind("down_left", false), ["Smith", 125], "GrindTrickList by direction")
+	assert_eq(SkateTricks.named_grind("left", true), ["Boardslide", 200], "a rail taken across the travel is a slide")
+	assert_eq(SkateTricks.named_grind("up", true), ["Nosegrind", 100], "except where THUG has no slide for the direction")
+	assert_eq(SkateTricks.named(SkateTricks.LIPS, ""), ["Nose Stall", 300], "DefaultLipTrick")
+	assert_eq(SkateTricks.named(SkateTricks.LIPS, "up_right"), ["The Switcheroo", 600], "HawkLip")
 	assert_eq(SkateTricks.named(SkateTricks.GRINDS, "sideways"), ["50-50", 100], "an unknown direction is the plain trick")
 	assert_eq(SkateTricks.direction_of(Vector2(0.0, 1.0)), "up")
 	assert_eq(SkateTricks.direction_of(Vector2(-1.0, 0.0)), "left")
+	assert_eq(SkateTricks.direction_of(Vector2(1.0, -1.0)), "down_right", "both held is the diagonal")
 	assert_eq(SkateTricks.direction_of(Vector2.ZERO), "")
+	assert_eq(SkateTricks.extra_for("Kickflip"), ["Double Kickflip", 500], "ExtraTricks")
+	assert_eq(SkateTricks.extra_for("Double Kickflip"), ["Triple Kickflip", 1000])
+	assert_eq(SkateTricks.extra_for("Triple Kickflip"), [], "and no further")
+	assert_eq(SkateTricks.double_tap("flip", ["up", "up"]), ["Sal Flip", 900], "Air_U_U_Square")
+	assert_eq(SkateTricks.double_tap("grind", ["down", "down"]), ["Bluntslide", 250])
+	assert_eq(SkateTricks.double_tap("flip", ["up", "down"]), [])
 
 
 func test_the_spin_counts_to_the_nearest_half_turn_with_the_slop() -> void:
@@ -87,6 +100,50 @@ func test_a_combo_sums_and_multiplies_and_a_clean_landing_banks_it() -> void:
 	assert_eq(tricks.names(), ["Ollie"], "and a spin with no trick in the air is on the ollie (THUG's 75 points)")
 	assert_eq(tricks.combo_points(), 150)
 	assert_eq(tricks.add_spin(180.0), "BS 180", "An odd half turn on an ollie lands fakie, so its side is swapped")
+
+
+func test_the_button_again_mid_flip_is_the_extra_and_the_combo_takes_the_new_name() -> void:
+	var tricks: SkateTricks = SkateTricks.new()
+	tricks.add("Kickflip", 100)
+	tricks.upgrade_last("Double Kickflip", 500)
+	assert_eq(tricks.names(), ["Double Kickflip"], "The extra replaces the trick, it is not a second one")
+	assert_eq(tricks.combo_points(), 500)
+	tricks.upgrade_last("Triple Kickflip", 1000)
+	assert_eq(tricks.combo_points(), 1000)
+	tricks.land_clean()
+	tricks.add("Kickflip", 100)
+	assert_eq(tricks.combo_points(), 100, "A kickflip that became a triple does not count as a kickflip done")
+
+
+func test_in_the_air_the_flip_button_again_doubles_the_flip_and_a_double_tap_names_the_flip() -> void:
+	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	await wait_physics_frames(2)
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.air_trick, "Kickflip")
+	await wait_physics_frames(6)
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.air_trick, "Double Kickflip", "The button again mid-flip is the extra")
+	assert_eq(board.tricks.names(), ["Double Kickflip"])
+	assert_lt(board._air_trick_time, 0.05, "and the flip turns again from the start")
+	await wait_physics_frames(6)
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.air_trick, "Triple Kickflip")
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.air_trick, "Triple Kickflip", "and there is no further extra")
+	# A new air (once the bail a triple needs more air than this has is over): Up, Up, Flip is the Sal Flip
+	var frames: int = 0
+	while (board.state != Skateboard.State.GROUND or board._bail_timer > 0.0) and frames < 240:
+		await get_tree().physics_frame
+		frames += 1
+	await wait_physics_frames(2)
+	board._clock += 10.0
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	await wait_physics_frames(2)
+	board.ride_input(player, _event(&"move_up"))
+	board.ride_input(player, _event(&"move_up"))
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.air_trick, "Sal Flip", "Up, Up, Flip is the double-tap trick")
 
 
 func test_a_trick_done_again_in_the_run_is_worth_less_each_time() -> void:
@@ -271,6 +328,22 @@ func test_a_manual_out_of_the_landing_keeps_the_combo_and_a_grind_adds_its_name(
 	assert_has(board.tricks.names(), "Nosegrind", "Grind taken with Up held is a nosegrind")
 
 
+func test_a_rail_taken_across_the_travel_is_a_boardslide() -> void:
+	# The ledge's front rail runs along x at z = 15.7; come at it along z, across it, with Grind held
+	player.warp_to(Transform3D(Basis(Vector3.UP, 0.0), Vector3(0.0, 0.9, 14.5)))
+	player.velocity = Vector3(0.0, 1.0, 5.0)
+	board.state = Skateboard.State.AIR
+	board._was_on_floor = false
+	board._old_position = player.global_position
+	Input.action_press(&"action")
+	var frames: int = 0
+	while board.state != Skateboard.State.RAIL and frames < 60:
+		await get_tree().physics_frame
+		frames += 1
+	assert_eq(board.state, Skateboard.State.RAIL)
+	assert_has(board.tricks.names(), "Boardslide", "Taken across the travel it is a boardslide, THUG's slide entries")
+
+
 func test_a_revert_in_the_window_keeps_the_combo_after_a_vert_landing() -> void:
 	var tricks: SkateTricks = board.tricks
 	tricks.add("Melon", 300)
@@ -306,6 +379,8 @@ func test_the_board_has_an_animation_for_the_ollie_and_every_flip() -> void:
 		assert_true(board.animation_player.has_animation(animation), "%s has the animation %s" % [flip[0], animation])
 		assert_almost_eq(board.animation_player.get_animation(animation).length, SkateTricks.FLIP_TIME, 0.01, "%s takes as long as the trick" % flip[0])
 	assert_eq(board.animation_player.get_animation("kickflip").track_get_path(0), NodePath("Board:rotation"), "The animations turn the pivot the mesh hangs off")
+	for name: String in ["varial_kickflip", "varial_heelflip", "inward_heelflip", "sal_flip"]:
+		assert_true(board.animation_player.has_animation(name), name + " is animated too")
 
 
 func test_the_pop_and_a_flip_turn_the_board_and_a_landing_puts_it_back() -> void:

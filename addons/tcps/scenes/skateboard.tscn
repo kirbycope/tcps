@@ -352,6 +352,36 @@ theme_override_font_sizes/font_size = 22
 horizontal_alignment = 1
 text = "200 x 2"
 
+[node name="SpecialBar" type="ProgressBar" parent="HUD"]
+visible = false
+layout_mode = 3
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -44.0
+offset_right = 216.0
+offset_bottom = -30.0
+grow_vertical = 0
+max_value = 1.0
+step = 0.001
+show_percentage = false
+
+[node name="SpecialLabel" type="Label" parent="HUD"]
+visible = false
+layout_mode = 3
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -72.0
+offset_right = 216.0
+offset_bottom = -46.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "SPECIAL"
+
 [node name="Score" type="Label" parent="HUD"]
 visible = false
 layout_mode = 3

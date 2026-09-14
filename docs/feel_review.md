@@ -141,3 +141,11 @@ wall rides and wallplants on the concrete wall, spine transfers over the new spi
 pipe's deck, which the new bank behind it leads up to; the lip camera drops into the pipe and looks up, and a
 trick in vert air zooms the camera in. What is left of THUG's skater is the special meter and its tricks,
 skitching, and getting off the board to walk.
+
+## The score and the special meter
+
+Every trick's points are now THUG's own, read from its trick scripts, and the score works as its Score module
+does: a spin multiplies the trick it is on, a trick repeated in the run depreciates, time on a grind or a manual
+earns nothing, and the special meter fills as the combo grows, lights at three thousand, lifts every stat by three
+and opens the created skater's three special tricks. Nothing in the scoring is a guess any more; what is left of
+THUG's skater is skitching, walking, and the rest of its trick list.

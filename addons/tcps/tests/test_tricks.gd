@@ -46,8 +46,9 @@ func _place(at: Vector3, heading: Vector3, speed: float) -> void:
 func test_the_tables_name_tricks_by_the_direction_held() -> void:
 	assert_eq(SkateTricks.named(SkateTricks.FLIPS, ""), ["Kickflip", 100])
 	assert_eq(SkateTricks.named(SkateTricks.FLIPS, "left"), ["Heelflip", 100])
-	assert_eq(SkateTricks.named(SkateTricks.GRABS, "down"), ["Tailgrab", 100])
-	assert_eq(SkateTricks.named(SkateTricks.GRINDS, "up"), ["Nosegrind", 150])
+	assert_eq(SkateTricks.named(SkateTricks.GRABS, "down"), ["Tailgrab", 300], "THUG's own points, from airtricks.q")
+	assert_eq(SkateTricks.named(SkateTricks.GRINDS, "up"), ["Nosegrind", 100])
+	assert_eq(SkateTricks.named(SkateTricks.LIPS, "left"), ["Disaster", 600])
 	assert_eq(SkateTricks.named(SkateTricks.GRINDS, "sideways"), ["50-50", 100], "an unknown direction is the plain trick")
 	assert_eq(SkateTricks.direction_of(Vector2(0.0, 1.0)), "up")
 	assert_eq(SkateTricks.direction_of(Vector2(-1.0, 0.0)), "left")
@@ -68,20 +69,96 @@ func test_the_spin_counts_to_the_nearest_half_turn_with_the_slop() -> void:
 func test_a_combo_sums_and_multiplies_and_a_clean_landing_banks_it() -> void:
 	var tricks: SkateTricks = SkateTricks.new()
 	tricks.add("Kickflip", 100)
-	tricks.add_spin(170.0)
+	assert_eq(tricks.add_spin(170.0, true), "FS 180", "A left spin is frontside")
 	tricks.add("Manual", 100)
-	assert_eq(tricks.combo, ["Kickflip", "FS 180", "Manual"])
-	assert_eq(tricks.combo_total(), 300 * 3, "Base points times the number of tricks")
-	assert_eq(tricks.total_text(), "300 x 3")
-	assert_eq(tricks.combo_text(), "Kickflip + FS 180 + Manual")
-	assert_eq(tricks.land_clean(), 900)
-	assert_eq(tricks.score, 900)
+	assert_eq(tricks.names(), ["Kickflip", "Manual"])
+	assert_eq(tricks.combo_points(), 150 + 100, "The spin multiplies the trick it is on: a 180 is one and a half times (THUG's SPIN_MULT_VALUES)")
+	assert_eq(tricks.combo_total(), 250 * 2, "Base points times the number of tricks")
+	assert_eq(tricks.total_text(), "250 x 2")
+	assert_eq(tricks.combo_text(), "FS 180 Kickflip + Manual")
+	assert_eq(tricks.land_clean(), 500)
+	assert_eq(tricks.score, 500)
 	assert_true(tricks.combo.is_empty())
-	tricks.add("Melon", 100)
+	tricks.add("Melon", 300)
 	tricks.bail()
-	assert_eq(tricks.score, 900, "A bail loses the combo, not the score")
+	assert_eq(tricks.score, 500, "A bail loses the combo, not the score")
 	assert_eq(SkateTricks._with_commas(1234567), "1,234,567")
 	assert_eq(tricks.add_spin(-360.0), "BS 360", "A right spin is backside")
+	assert_eq(tricks.names(), ["Ollie"], "and a spin with no trick in the air is on the ollie (THUG's 75 points)")
+	assert_eq(tricks.combo_points(), 150)
+	assert_eq(tricks.add_spin(180.0), "BS 180", "An odd half turn on an ollie lands fakie, so its side is swapped")
+
+
+func test_a_trick_done_again_in_the_run_is_worth_less_each_time() -> void:
+	var tricks: SkateTricks = SkateTricks.new()
+	tricks.add("Kickflip", 100)
+	tricks.add("Kickflip", 100)
+	assert_eq(tricks.combo_points(), 100 + 75, "The second in a combo is three quarters (THUG's DEPREC_VALUES)")
+	tricks.land_clean()
+	tricks.add("Kickflip", 100)
+	assert_eq(tricks.combo_points(), 50, "and the third in the run is half")
+	tricks.bail()
+	tricks.add("Kickflip", 100)
+	assert_eq(tricks.combo_points(), 50, "A bailed combo's uses do not count")
+
+
+func test_the_special_meter_fills_with_the_combo_lights_full_and_drains() -> void:
+	var tricks: SkateTricks = SkateTricks.new()
+	tricks.add("Kickflip", 100)
+	assert_almost_eq(tricks.special, 100.0, 0.01, "The meter is fed as the combo grows, before the landing")
+	tricks.add("Manual", 100)
+	assert_almost_eq(tricks.special, 400.0, 0.01, "by what the combo's worth grew")
+	assert_false(tricks.special_lit)
+	assert_almost_eq(tricks.stat(), SkateTricks.STAT, 0.001)
+	tricks.update(2.0)
+	assert_almost_eq(tricks.special, 300.0, 0.01, "It drains fifty points a second")
+	tricks.add("McTwist", 5000)
+	assert_true(tricks.special_lit, "Past three thousand it lights")
+	assert_almost_eq(tricks.special, SkateTricks.SPECIAL_FULL, 0.01, "and holds at the top")
+	assert_almost_eq(tricks.stat(), SkateTricks.SPECIAL_STAT, 0.001, "with three more on every stat")
+	tricks.update(1.0)
+	assert_almost_eq(tricks.special, 2800.0, 0.01, "Lit, it drains two hundred a second")
+	assert_true(tricks.special_lit, "and stays lit while any is left")
+	tricks.update(20.0)
+	assert_false(tricks.special_lit, "Empty, it goes out")
+	tricks.add("Kickflip", 100)
+	tricks.add("McTwist", 5000)
+	assert_true(tricks.special_lit)
+	tricks.bail()
+	assert_almost_eq(tricks.special, 0.0, 0.01, "A bail empties it (THUG's Score::Bail)")
+	assert_false(tricks.special_lit)
+
+
+func test_two_taps_and_a_button_are_a_special_trick_only_with_the_meter_lit() -> void:
+	var tricks: SkateTricks = SkateTricks.new()
+	assert_eq(tricks.special_trick("flip", ["left", "right"]), [], "Unlit, the taps mean nothing")
+	tricks.special_lit = true
+	assert_eq(tricks.special_trick("flip", ["left", "right"]), ["Kickflip Underflip", 1000], "Lit, Left Right Flip is the created skater's special flip")
+	assert_eq(tricks.special_trick("grab", ["right", "down"]), ["McTwist", 5000])
+	assert_eq(tricks.special_trick("grind", ["right", "down"]), ["Tailblock Slide", 500])
+	assert_eq(tricks.special_trick("flip", ["right", "left"]), [], "in that order")
+	assert_eq(tricks.special_trick("flip", ["right"]), [])
+
+
+func test_the_board_reads_the_taps_and_the_meter_lifts_the_stats() -> void:
+	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
+	board._clock = 10.0
+	board.ride_input(player, _event(&"move_left"))
+	board.ride_input(player, _event(&"move_right"))
+	assert_eq(board._recent_taps(), ["left", "right"], "The last two taps, oldest first")
+	board._clock += SkateTricks.SPECIAL_WINDOW + 0.1
+	assert_eq(board._recent_taps(), [], "and none once the window has passed")
+	assert_almost_eq(board._stat(Skateboard.OLLIE_MAX_SPEED_STAT), Skateboard.OLLIE_MAX_SPEED, 0.001, "A stat reads at the middle of its range")
+	board.tricks.special_lit = true
+	assert_almost_eq(board._stat(Skateboard.OLLIE_MAX_SPEED_STAT), lerpf(414.0, 450.0, 0.8) * Skateboard.INCH, 0.001, "and eight of ten with the meter lit")
+	board.ride_input(player, _event(&"move_left"))
+	board.ride_input(player, _event(&"move_right"))
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	await wait_physics_frames(2)
+	board.ride_input(player, _event(&"attack"))
+	assert_eq(board.air_trick, "Kickflip Underflip", "Left, Right, Flip in the air with the meter lit is the special flip")
+	board._refresh_hud()
+	assert_true(board.special_label.visible, "and the HUD says SPECIAL")
 
 
 func test_a_flip_in_the_air_lands_clean_once_it_is_done_and_banks() -> void:
@@ -93,7 +170,7 @@ func test_a_flip_in_the_air_lands_clean_once_it_is_done_and_banks() -> void:
 	assert_eq(board.state, Skateboard.State.AIR)
 	board.ride_input(player, _event(&"attack"))
 	assert_eq(board.air_trick, "Kickflip", "Flip with nothing held is a kickflip")
-	assert_eq(board.tricks.combo, ["Kickflip"])
+	assert_eq(board.tricks.names(), ["Kickflip"])
 	var frames: int = 0
 	while board.state != Skateboard.State.GROUND and frames < 120:
 		await get_tree().physics_frame
@@ -125,7 +202,7 @@ func test_landing_mid_flip_is_a_bail() -> void:
 	assert_gt(board._bail_timer, 0.0)
 
 
-func test_a_grab_lasts_while_held_and_scores_the_hold() -> void:
+func test_a_grab_lasts_while_held() -> void:
 	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
 	board._ollie(Skateboard.MAX_TENSE_TIME)
 	await wait_physics_frames(2)
@@ -134,10 +211,11 @@ func test_a_grab_lasts_while_held_and_scores_the_hold() -> void:
 	Input.action_press(&"sprint")
 	board.ride_input(player, _event(&"sprint"))
 	assert_eq(board.air_trick, "Tailgrab", "Grab with Down held is a tailgrab")
+	assert_eq(board.tricks.combo_points(), 300, "worth THUG's three hundred")
 	Input.action_release(&"move_down")
-	var base: int = board.tricks.combo_points
 	await wait_physics_frames(15)
-	assert_gt(board.tricks.combo_points, base, "Holding the grab keeps adding points")
+	assert_eq(board.air_trick, "Tailgrab", "Held, the grab goes on")
+	assert_eq(board.tricks.combo_points(), 300, "and the hold adds nothing, as in THUG")
 	Input.action_release(&"sprint")
 	await wait_physics_frames(2)
 	assert_eq(board.air_trick, "", "Letting go ends the grab")
@@ -155,7 +233,8 @@ func test_a_spin_in_the_air_is_counted_on_landing() -> void:
 		await get_tree().physics_frame
 		frames += 1
 	assert_eq(board.state, Skateboard.State.GROUND)
-	assert_has(board.tricks.combo, "FS 180", "A left spin of about a half turn lands as a frontside 180")
+	assert_eq(board.tricks.names(), ["Ollie"], "A spin on a plain ollie is the ollie's")
+	assert_string_contains(board.tricks.combo_text(), "180 Ollie", "A left spin of about a half turn lands as a 180")
 
 
 func test_a_manual_out_of_the_landing_keeps_the_combo_and_a_grind_adds_its_name() -> void:
@@ -174,8 +253,7 @@ func test_a_manual_out_of_the_landing_keeps_the_combo_and_a_grind_adds_its_name(
 	assert_eq(board.trick, "manual", "The manual went in on the landing")
 	await wait_physics_frames(int(Skateboard.BANK_GRACE * 60.0) + 3)
 	assert_true(banked.is_empty(), "so the combo is not banked yet")
-	assert_eq(board.tricks.combo, ["Kickflip", "Manual"])
-	assert_eq(board.tricks.combo.size(), 2)
+	assert_eq(board.tricks.names(), ["Kickflip", "Manual"])
 	# Now a grind: throw the rider at the ledge with Up held for a nosegrind
 	board._end_trick(false)
 	player.warp_to(Transform3D(Basis(Vector3.UP, atan2(1.0, 0.0)), Vector3(-3.6, 0.9, 15.7)))
@@ -190,32 +268,35 @@ func test_a_manual_out_of_the_landing_keeps_the_combo_and_a_grind_adds_its_name(
 		await get_tree().physics_frame
 		frames += 1
 	assert_eq(board.state, Skateboard.State.RAIL)
-	assert_has(board.tricks.combo, "Nosegrind", "Grind taken with Up held is a nosegrind")
+	assert_has(board.tricks.names(), "Nosegrind", "Grind taken with Up held is a nosegrind")
 
 
 func test_a_revert_in_the_window_keeps_the_combo_after_a_vert_landing() -> void:
 	var tricks: SkateTricks = board.tricks
-	tricks.add("Melon", 100)
+	tricks.add("Melon", 300)
 	board._landed_from_vert_at = board._now()
 	board._bank_timer = Skateboard.BANK_GRACE
 	board.ride_input(player, _event(&"focus"))
-	assert_has(tricks.combo, "Revert", "Focus within the window after a vert landing is a revert")
+	assert_has(tricks.names(), "Revert", "Focus within the window after a vert landing is a revert")
 	assert_eq(board._landed_from_vert_at, -1.0, "and only one")
 	board.ride_input(player, _event(&"focus"))
-	assert_eq(tricks.combo.count("Revert"), 1)
+	assert_eq(tricks.names().count("Revert"), 1)
 
 
 func test_the_hud_shows_the_combo_and_the_score() -> void:
 	board.tricks.add("Kickflip", 100)
-	board.tricks.add_spin(180.0)
+	board.tricks.add_spin(180.0, true)
 	board._refresh_hud()
 	assert_true(board.trick_line.visible)
-	assert_eq(board.trick_line.text, "Kickflip + FS 180")
-	assert_eq(board.trick_total.text, "200 x 2")
+	assert_eq(board.trick_line.text, "FS 180 Kickflip")
+	assert_eq(board.trick_total.text, "150 x 1")
+	assert_true(board.special_bar.visible, "The special meter shows")
+	assert_almost_eq(board.special_bar.value, 150.0 / SkateTricks.SPECIAL_FULL, 0.001, "with what the combo has fed it")
+	assert_false(board.special_label.visible, "unlit")
 	board.tricks.land_clean()
 	board._refresh_hud()
 	assert_false(board.trick_line.visible, "Nothing in the combo, nothing on the line")
-	assert_eq(board.score_label.text, "SCORE 400")
+	assert_eq(board.score_label.text, "SCORE 150")
 
 
 func test_the_board_has_an_animation_for_the_ollie_and_every_flip() -> void:

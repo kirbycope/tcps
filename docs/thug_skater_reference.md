@@ -466,6 +466,29 @@ focus -> cam+2 in, min 11.9 in, 8 in side feelers.
   L2/R2 transfer/acid drop/recovery, Down brake + sharp turn, Up break vert / sticky crests / skitch
   (> `Skitch_Hold_Time`).
 
+## 9b. The score (`Code/Sk/Modules/Skate/score.cpp`, the trick scripts)
+
+**Points** are in the trick scripts (`Score = ` in `airtricks.q`, `grindscripts.q`, `manualtricks.q`,
+`liptricks.q`; `SetTrickScore` in `walltricks.q`, `groundtricks.q`, `tricks.q`): Kickflip, Heelflip, Pop Shove-It,
+Impossible 100, Hardflip 300; Melon, Indy, Nosegrab, Tailgrab 300, Stalefish 350; 50-50, Nosegrind, 5-0 100,
+Boardslide, Lipslide 200; Manual, Nose Manual 100; Nose Stall 300, Axle Stall 400, Rock to Fakie, Blunt to Fakie
+500, Disaster 600; BS/FS Wallride 200, Wallplant 750 (`Air_Wallplant`), `TRANSFER_POINTS` 250 (spine and hip),
+`ACID_DROP_POINTS` 250, Revert 100, Ollie 75. The created skater's specials (`skater_profile.q`): McTwist 5000
+(`SpAir_R_D_Circle`), Kickflip Underflip 1000 (`SpAir_L_R_Square`), Tailblock Slide 500 (`SpGrind_R_D_Triangle`),
+triggered by `TripleInOrder` (two directions then the button within 400 ms) only in the special state.
+
+**A trick's worth** `:170-200`: `base * deprecMult(uses) * spinMult(index) / 200`, with `DEPREC_VALUES`
+`{100, 75, 50, 25, 10}` per cent indexed by how often the trick was done in the run (banked combos plus this one,
+`:642-660`; a bail clears the combo's counts, `:1196`) and `SPIN_MULT_VALUES` `{2, 3, 4, 5, 6, 7}` over 2 indexed by
+`(spin + spin_count_slop) / 180` (`:755-850`), capped at the last. The spin attaches to the current spin trick (the
+first non-blocking trick after the last blocking one), or to the Ollie, whose odd half turns swap FS and BS. No
+points accrue for time on a grind or a manual.
+
+**Special** `:295-305`, `:1010-1035`, `:1405-1427`: `m_specialScore` 0..3000; with `NewSpecial` (physics.q, on)
+it is fed `scorePot * mult - m_recentSpecialScorePot` every time the combo grows; drains `50/s`, `200/s` while
+active; `>= 3000` sets active, active until it reaches 0; `Bail()` zeroes it. `CSkater::GetStat` `:588` adds 3 to
+every stat while active, and `CTrickComponent` `:2152` checks the special tricks array only then.
+
 ## 10. What a rewrite must copy, ranked
 
 1. **Velocity is rotated, never projected, through ground transitions**: `RotateToPlane` at the top of every

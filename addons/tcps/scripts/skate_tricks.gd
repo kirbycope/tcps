@@ -1,60 +1,81 @@
 class_name SkateTricks
 extends RefCounted
-## The trick layer and the score, after THUG's trick and score components (CTrickComponent, CSkaterScoreComponent):
-## which trick a button and a direction name, what each is worth, and the combo they add up to. A combo is every
-## trick since the last clean landing; its points are summed and multiplied by the number of tricks in it, banked
-## into [member score] when the skater lands clean, and lost in a bail. Grinds, manuals and reverts are the links
-## that carry a combo across a landing.
+## The trick layer and the score, after THUG's trick and score code (CTrickComponent, Score in
+## Code/Sk/Modules/Skate/score.cpp) and its trick scripts (airtricks.q, grindscripts.q, manualtricks.q,
+## liptricks.q, walltricks.q, tricks.q in the decompiled scripts): which trick a button and a direction name, what
+## each is worth, and the combo they add up to. A combo is every trick since the last clean landing; each trick's
+## points are its base times the spin attached to it (SPIN_MULT_VALUES) times its depreciation for having been done
+## before in the run (DEPREC_VALUES), summed and multiplied by the number of tricks, banked into [member score] on a
+## clean landing and lost in a bail. Grinds, manuals and reverts are the links that carry a combo across a landing.
+## The special meter fills as the combo grows, lights at [constant SPECIAL_FULL], drains all the while, and lit it
+## adds three to every stat and opens the special tricks.
 
+# The points are THUG's own, from its trick scripts.
 const FLIPS: Dictionary = { ## Square in THUG. Direction held at the press, then the name and the points.
 	"": ["Kickflip", 100],
 	"left": ["Heelflip", 100],
 	"right": ["Pop Shove-It", 100],
-	"up": ["Impossible", 150],
-	"down": ["Hardflip", 150],
+	"up": ["Impossible", 100],
+	"down": ["Hardflip", 300],
 }
 const GRABS: Dictionary = { ## Circle in THUG.
-	"": ["Melon", 100],
-	"left": ["Indy", 100],
-	"right": ["Stalefish", 150],
-	"up": ["Nosegrab", 100],
-	"down": ["Tailgrab", 100],
+	"": ["Melon", 300],
+	"left": ["Indy", 300],
+	"right": ["Stalefish", 350],
+	"up": ["Nosegrab", 300],
+	"down": ["Tailgrab", 300],
 }
 const GRINDS: Dictionary = { ## Triangle in THUG, by the direction held when the rail is taken.
 	"": ["50-50", 100],
-	"left": ["Boardslide", 150],
+	"left": ["Boardslide", 200],
 	"right": ["Lipslide", 200],
-	"up": ["Nosegrind", 150],
-	"down": ["5-0", 150],
+	"up": ["Nosegrind", 100],
+	"down": ["5-0", 100],
 }
 const MANUALS: Dictionary = {"manual": ["Manual", 100], "nose_manual": ["Nose Manual", 100]}
 const LIPS: Dictionary = { ## Grind at the lip of a vert wall on the way up, by the direction held.
-	"": ["Axle Stall", 250],
-	"left": ["Disaster", 250],
-	"right": ["Blunt To Fakie", 250],
-	"up": ["Rock To Fakie", 200],
-	"down": ["Nose Stall", 200],
+	"": ["Axle Stall", 400],
+	"left": ["Disaster", 600],
+	"right": ["Blunt To Fakie", 500],
+	"up": ["Rock To Fakie", 500],
+	"down": ["Nose Stall", 300],
 }
-const WALLRIDE: Array = ["Wallride", 250] ## Points for these are THPS-era values; THUG keeps its trick scores in scripts not in the repository.
-const WALLPLANT: Array = ["Wallplant", 400]
-const SPINE_TRANSFER: Array = ["Spine Transfer", 750]
-const HIP_TRANSFER: Array = ["Hip Transfer", 500]
-const ACID_DROP: Array = ["Acid Drop", 500]
-const SPIN_POINTS: Dictionary = {180: 100, 360: 250, 540: 500, 720: 1000, 900: 2000} ## Beyond 900 the last entry stands.
+const OLLIE: Array = ["Ollie", 75] ## What a spin with no trick in the air attaches to.
+const WALLRIDE: Array = ["Wallride", 200]
+const WALLPLANT: Array = ["Wallplant", 750]
+const SPINE_TRANSFER: Array = ["Spine Transfer", 250] ## TRANSFER_POINTS, for the hip too.
+const HIP_TRANSFER: Array = ["Hip Transfer", 250]
+const ACID_DROP: Array = ["Acid Drop", 250] ## ACID_DROP_POINTS.
+const REVERT: Array = ["Revert", 100]
+const SPECIALS: Dictionary = { ## The three special slots THUG gives a created skater (skater_profile.q): two directions then the button, within SPECIAL_WINDOW, while the meter is lit.
+	"flip": {"taps": ["left", "right"], "trick": ["Kickflip Underflip", 1000]},
+	"grab": {"taps": ["right", "down"], "trick": ["McTwist", 5000]},
+	"grind": {"taps": ["right", "down"], "trick": ["Tailblock Slide", 500]},
+}
+const SPECIAL_WINDOW: float = 0.4 ## TripleInOrder's 400 ms: both taps and the button inside it.
+const SPIN_MULTIPLIERS: Array[float] = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5] ## SPIN_MULT_VALUES {2..7} over 2, by half turns; past a 900 the last stands.
+const DEPRECIATION: Array[int] = [100, 75, 50, 25, 10] ## DEPREC_VALUES: per cent of the base for the first, second... time a trick is done in the run.
 const SPIN_SLOP: float = 60.0 ## spin_count_slop: a landing this far short of the next half turn still counts it.
-const REVERT_POINTS: int = 25
-const HOLD_POINTS_PER_SECOND: int = 200 ## What a grind, a manual or a held grab earns per second on top of its base.
 const FLIP_TIME: float = 0.45 ## Seconds a flip trick takes; landing before it is done is a bail.
 const GRAB_MIN_TIME: float = 0.25 ## A grab shorter than this is not one.
+const SPECIAL_FULL: float = 3000.0 ## The meter's top, in points (Score::Update).
+const SPECIAL_DRAIN: float = 50.0 ## Points a second the meter loses.
+const SPECIAL_LIT_DRAIN: float = 200.0 ## And while lit.
+const STAT: float = 0.5 ## Where in each stat's range the board sits: 5 of 10.
+const SPECIAL_STAT: float = 0.8 ## And with the meter lit: +3 (CSkater::GetStat).
 
 var score: int = 0 ## Points banked by clean landings.
-var combo: Array[String] = [] ## The tricks since the last clean landing, in order, as shown on the HUD.
-var combo_points: int = 0 ## Their base points summed.
+var combo: Array[Dictionary] = [] ## The tricks since the last clean landing, in order: {"name", "points", "spin", "spin_text", "uses"}.
 var last_banked: int = 0 ## What the last clean landing was worth, for the HUD.
+var special: float = 0.0 ## The meter, 0 to [constant SPECIAL_FULL].
+var special_lit: bool = false ## Full and lit: stats up three, special tricks open, until it drains away.
+var _history: Dictionary = {} ## Trick name to times done in banked combos this run, for the depreciation.
+var _combo_uses: Dictionary = {} ## Trick name to times done in this combo.
+var _recent_special: int = 0 ## What of the combo's worth the meter has already been given (m_recentSpecialScorePot).
 
 
-## The trick for [param table] (one of [constant FLIPS], [constant GRABS], [constant GRINDS]) with [param direction]
-## held ("", "left", "right", "up" or "down"), as [name, points].
+## The trick for [param table] (one of [constant FLIPS], [constant GRABS], [constant GRINDS], [constant LIPS])
+## with [param direction] held ("", "left", "right", "up" or "down"), as [name, points].
 static func named(table: Dictionary, direction: String) -> Array:
 	return table.get(direction, table[""])
 
@@ -85,58 +106,134 @@ static func spin_is_sloppy(degrees_turned: float) -> bool:
 	return turned > SPIN_SLOP and turned < 180.0 - SPIN_SLOP
 
 
-## Adds [param name] worth [param points] to the combo.
+## What a [param spin] of so many degrees multiplies its trick by (Score::spinMult).
+static func spin_multiplier(spin: int) -> float:
+	return SPIN_MULTIPLIERS[mini(spin / 180, SPIN_MULTIPLIERS.size() - 1)]
+
+
+## The special trick a [param kind] ("flip", "grab" or "grind") button gives after [param taps] (the last two
+## directions tapped, oldest first) with the meter lit, as [name, points], or empty for the plain trick.
+func special_trick(kind: String, taps: Array) -> Array:
+	if not special_lit or not SPECIALS.has(kind):
+		return []
+	var slot: Dictionary = SPECIALS[kind]
+	return slot["trick"] if taps == slot["taps"] else []
+
+
+## Adds [param name] worth [param points] to the combo, depreciated for every time it has been done before.
 func add(name: String, points: int) -> void:
-	combo.append(name)
-	combo_points += points
+	var uses: int = int(_history.get(name, 0)) + int(_combo_uses.get(name, 0))
+	_combo_uses[name] = int(_combo_uses.get(name, 0)) + 1
+	combo.append({"name": name, "points": points, "spin": 0, "spin_text": "", "uses": uses})
+	_feed_special()
 
 
-## Adds the spin a landing counts, named the THPS way ("FS 360", frontside for a left spin), or nothing for less
-## than a half turn. Returns the name added, or "".
-func add_spin(degrees_turned: float) -> String:
+## Attaches the spin a landing counts to the trick of that air (the combo's last, when [param on_last]), or to an
+## ollie added for it (THUG's "Ollie"), named the THPS way ("FS 360", frontside for a left spin; an ollie's odd
+## half turns land fakie, so their side is swapped). Returns the spin's name, or "" for less than a half turn.
+func add_spin(degrees_turned: float, on_last: bool = false) -> String:
 	var spin: int = counted_spin(degrees_turned)
 	if spin == 0:
 		return ""
-	var name: String = ("FS " if degrees_turned > 0.0 else "BS ") + str(spin)
-	add(name, SPIN_POINTS.get(spin, SPIN_POINTS[900]))
-	return name
+	var frontside: bool = degrees_turned > 0.0
+	if not on_last or combo.is_empty():
+		add(OLLIE[0], OLLIE[1])
+		if (spin / 180) % 2 == 1:
+			frontside = not frontside
+	var text: String = ("FS " if frontside else "BS ") + str(spin)
+	var entry: Dictionary = combo.back()
+	entry["spin"] = spin
+	entry["spin_text"] = text
+	_feed_special()
+	return text
 
 
-## Adds points to the last trick for time held on it (a grind, a manual, a held grab).
-func hold(delta: float) -> void:
-	if not combo.is_empty():
-		combo_points += int(HOLD_POINTS_PER_SECOND * delta)
+## What [param entry] of the combo is worth: base times depreciation times spin (Score::get_packed_score).
+static func entry_points(entry: Dictionary) -> int:
+	var depreciation: int = DEPRECIATION[mini(int(entry["uses"]), DEPRECIATION.size() - 1)]
+	return int(int(entry["points"]) * depreciation * spin_multiplier(int(entry["spin"])) / 100.0)
+
+
+## The combo's base points, every trick's worth summed.
+func combo_points() -> int:
+	var total: int = 0
+	for entry: Dictionary in combo:
+		total += entry_points(entry)
+	return total
 
 
 ## The combo's worth right now: base points times the number of tricks.
 func combo_total() -> int:
-	return combo_points * combo.size()
+	return combo_points() * combo.size()
 
 
-## A clean landing banks the combo. Returns what it was worth.
+## The names in the combo, in order, without their spins.
+func names() -> Array[String]:
+	var out: Array[String] = []
+	for entry: Dictionary in combo:
+		out.append(entry["name"])
+	return out
+
+
+## A clean landing banks the combo; what was done in it counts against the next. Returns what it was worth.
 func land_clean() -> int:
 	last_banked = combo_total()
 	score += last_banked
+	for name: String in _combo_uses:
+		_history[name] = int(_history.get(name, 0)) + int(_combo_uses[name])
 	combo.clear()
-	combo_points = 0
+	_combo_uses.clear()
+	_recent_special = 0
 	return last_banked
 
 
-## A bail throws the combo away.
+## A bail throws the combo away, and empties the special meter (Score::Bail).
 func bail() -> void:
 	combo.clear()
-	combo_points = 0
+	_combo_uses.clear()
+	_recent_special = 0
+	special = 0.0
+	special_lit = false
 
 
-## The HUD line: "Kickflip + FS 180 + Manual" and "1,250 x 3".
+## Runs the meter's drain (Score::Update): slow while it fills, fast while lit; empty, it goes out.
+func update(delta: float) -> void:
+	if special <= 0.0:
+		return
+	special -= (SPECIAL_LIT_DRAIN if special_lit else SPECIAL_DRAIN) * delta
+	if special <= 0.0:
+		special = 0.0
+		special_lit = false
+
+
+## Where in each stat's range the board sits right now.
+func stat() -> float:
+	return SPECIAL_STAT if special_lit else STAT
+
+
+## The HUD line: "FS 180 Kickflip + Manual" and "250 x 2".
 func combo_text() -> String:
-	return " + ".join(combo)
+	var parts: Array[String] = []
+	for entry: Dictionary in combo:
+		parts.append((str(entry["spin_text"]) + " " + str(entry["name"])) if int(entry["spin"]) != 0 else str(entry["name"]))
+	return " + ".join(parts)
 
 
 func total_text() -> String:
 	if combo.is_empty():
 		return ""
-	return "%s x %d" % [_with_commas(combo_points), combo.size()]
+	return "%s x %d" % [_with_commas(combo_points()), combo.size()]
+
+
+## The meter is given what the combo has grown by since it last was (Score::Trigger with NewSpecial): it fills as
+## the skater scores, not only on the landing.
+func _feed_special() -> void:
+	var worth: int = combo_total()
+	if worth > _recent_special:
+		special = minf(special + (worth - _recent_special), SPECIAL_FULL)
+		if special >= SPECIAL_FULL:
+			special_lit = true
+	_recent_special = worth
 
 
 static func _with_commas(value: int) -> String:

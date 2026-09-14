@@ -63,6 +63,16 @@ const LOCOMOTION_BLEND_PATH: String = "parameters/LocomotionStateMachine/Skatebo
 const INCH: float = 0.0254
 const DEAD_ZONE: float = 0.39 ## THUG reads the stick as a d-pad past 50 of 128; nothing is proportional.
 const KICK_ACCELERATION: float = 664.5 * INCH ## Physics_Standing_Acceleration_Stat 629..700: a kick is this much every second it is held.
+# Each *_STAT is a stat's (0, 10) range in THUG's units; the board reads it at SkateTricks.stat(), 5 of 10, or 8 with
+# the special meter lit (CSkater::GetStat adds 3), through _stat(). The constants above and below are the middles.
+const KICK_ACCELERATION_STAT: Vector2 = Vector2(629.0, 700.0)
+const KICK_MAX_SPEED_STAT: Vector2 = Vector2(394.0, 496.0)
+const CROUCH_KICK_ACCELERATION_STAT: Vector2 = Vector2(1057.0, 1200.0)
+const CROUCH_KICK_MAX_SPEED_STAT: Vector2 = Vector2(532.0, 675.0)
+const MAX_SPEED_STAT: Vector2 = Vector2(757.0, 900.0)
+const MAX_MAX_SPEED_STAT: Vector2 = Vector2(957.0, 1100.0)
+const OLLIE_MAX_SPEED_STAT: Vector2 = Vector2(414.0, 450.0)
+const AIR_SPIN_SPEED_STAT: Vector2 = Vector2(6.85, 7.75)
 const KICK_MAX_SPEED: float = 445.0 * INCH ## Skater_Max_Standing_Kick_Speed_Stat 394..496: kicking does nothing past this.
 const CROUCH_KICK_ACCELERATION: float = 1128.5 * INCH ## Physics_Crouching_Acceleration_stat 1057..1200: holding sprint is THUG's crouched kick.
 const CROUCH_KICK_MAX_SPEED: float = 603.5 * INCH ## Skater_Max_Crouched_Kick_Speed_Stat 532..675.
@@ -157,6 +167,7 @@ const AIR_TILT_SPEED: float = 2.5 ## How fast the lean eases back upright over f
 const MANUAL_TILT: float = deg_to_rad(25.0) ## How far the model pitches at the edge of the meter in a manual.
 const MIN_AIR_TIME: float = 0.1 ## Shorter hops are contact flicker on a steep transition, not a landing to turn for.
 const DISPLAY_NORMAL_SPEED: float = 14.0 ## Per-second rate the display normal drifts to the floor normal, smoothing a ramp's facets (THUG's adjust_normal).
+const SPECIAL_LIT_COLOUR: Color = Color(1.0, 0.85, 0.3) ## The meter's tint while lit.
 const SERVER_PEER: int = 1
 
 var player: Player ## The rider, or the Player looking at the board.
@@ -192,6 +203,8 @@ var _rerail_at: float = 0.0 ## Seconds (game time) before which no rail is taken
 var _bail_timer: float = 0.0
 var _last_tap: StringName = &""
 var _last_tap_at: float = -1.0
+var _taps: Array = [] ## The last two directions tapped, as [direction, clock], oldest first, for the special tricks.
+var _air_tricks: int = 0 ## Flips and grabs done in this air, so the landing's spin knows what to attach to.
 var _old_position: Vector3 = Vector3.ZERO ## Where the rider was at the end of the last tick; a rail is searched along the move from it.
 var _saved_floor_max_angle: float = 0.0
 var _saved_floor_snap_length: float = 0.0
@@ -231,6 +244,8 @@ var _up_since: float = -1.0 ## When Up went down, on the clock; -1 while it is u
 @onready var trick_line: Label = $HUD/TrickLine ## The combo so far.
 @onready var trick_total: Label = $HUD/TrickTotal ## What it is worth.
 @onready var score_label: Label = $HUD/Score ## The score banked.
+@onready var special_bar: ProgressBar = $HUD/SpecialBar ## The special meter, 0 to 1.
+@onready var special_label: Label = $HUD/SpecialLabel ## "SPECIAL", shown while the meter is lit.
 @onready var sfx_roll_on_cobblestone: AudioStreamPlayer3D = $SFX_Roll_on_Cobblestone
 @onready var sfx_roll_on_concrete: AudioStreamPlayer3D = $SFX_Roll_on_Concrete
 @onready var sfx_roll_on_wood: AudioStreamPlayer3D = $SFX_Roll_on_Wood
@@ -422,9 +437,11 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 	if state == State.AIR and air_trick == "":
 		var direction: String = SkateTricks.direction_of(_digital(player.player_input.motion))
 		if event.is_action_pressed(_action(keyboard_flip_action, pad_flip_action)):
-			_start_air_trick("flip", SkateTricks.named(SkateTricks.FLIPS, direction))
+			var special_flip: Array = tricks.special_trick("flip", _recent_taps())
+			_start_air_trick("flip", special_flip if not special_flip.is_empty() else SkateTricks.named(SkateTricks.FLIPS, direction))
 		elif event.is_action_pressed(_action(keyboard_grab_action, pad_grab_action)):
-			_start_air_trick("grab", SkateTricks.named(SkateTricks.GRABS, direction))
+			var special_grab: Array = tricks.special_trick("grab", _recent_taps())
+			_start_air_trick("grab", special_grab if not special_grab.is_empty() else SkateTricks.named(SkateTricks.GRABS, direction))
 
 	if event.is_action_pressed(_action(keyboard_grind_action, pad_grind_action)):
 		_grind_pressed_at = _now()
@@ -434,7 +451,7 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 	for revert: StringName in reverts:
 		if event.is_action_pressed(revert) and _landed_from_vert_at >= 0.0 and _now() - _landed_from_vert_at <= REVERT_WINDOW:
 			_landed_from_vert_at = -1.0
-			tricks.add("Revert", SkateTricks.REVERT_POINTS)
+			tricks.add(SkateTricks.REVERT[0], SkateTricks.REVERT[1])
 			_bank_timer = BANK_GRACE
 			_refresh_hud()
 
@@ -445,10 +462,24 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 	and player.velocity.slide(player.up_direction).length() <= SLOW_SPEED * 0.1:
 		locomotion_requested.emit(KICK_PUSH, false)
 
-	# Manual: Up then Down; nose manual: Down then Up (THUG matches the two taps script side)
-	for tap: StringName in [&"move_up", &"move_down"]:
+	# Manual: Up then Down; nose manual: Down then Up (THUG matches the two taps script side); every direction
+	# tapped is remembered for the special tricks' two taps and a button
+	for tap: StringName in [&"move_up", &"move_down", &"move_left", &"move_right"]:
 		if event.is_action_pressed(tap):
-			_tap(tap)
+			_taps.append([str(tap).trim_prefix("move_"), _now()])
+			if _taps.size() > 2:
+				_taps.pop_front()
+			if tap == &"move_up" or tap == &"move_down":
+				_tap(tap)
+
+
+## The two directions tapped within [constant SkateTricks.SPECIAL_WINDOW] of now, oldest first, or fewer.
+func _recent_taps() -> Array:
+	var out: Array = []
+	for tap: Array in _taps:
+		if _now() - float(tap[1]) <= SkateTricks.SPECIAL_WINDOW:
+			out.append(tap[0])
+	return out
 
 
 ## Whether a pop is possible right now: on the ground, on a rail, or falling back into a vert wall.
@@ -486,6 +517,12 @@ func _digital(motion: Vector2) -> Vector2:
 ## slow frame (or the movie writer's) never expires a press early. Stands still while the board is not ridden.
 func _now() -> float:
 	return _clock
+
+
+## A stat's value right now: [param range] is its (0, 10) pair, read at the board's stat (5, or 8 with the special
+## meter lit), in [param unit] (inches unless told otherwise).
+func _stat(range: Vector2, unit: float = INCH) -> float:
+	return lerpf(range.x, range.y, tricks.stat()) * unit
 
 
 # --- Physics ------------------------------------------------------------------------------------------------------
@@ -625,13 +662,13 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 	if braking:
 		speed = 0.0 if speed < 2.0 * BRAKE * delta else speed - BRAKE * delta
 	elif kicking and balance == null:
-		var cap: float = CROUCH_KICK_MAX_SPEED if sprint else KICK_MAX_SPEED
+		var cap: float = _stat(CROUCH_KICK_MAX_SPEED_STAT) if sprint else _stat(KICK_MAX_SPEED_STAT)
 		if speed < cap:
-			speed = minf(speed + (CROUCH_KICK_ACCELERATION if sprint else KICK_ACCELERATION) * delta, cap)
+			speed = minf(speed + (_stat(CROUCH_KICK_ACCELERATION_STAT) if sprint else _stat(KICK_ACCELERATION_STAT)) * delta, cap)
 	speed -= (CROUCH_WIND_DRAG if sprint else WIND_DRAG) * speed * speed * delta
-	if speed > MAX_SPEED:
+	if speed > _stat(MAX_SPEED_STAT):
 		speed -= HEAVY_DRAG * speed * speed * delta
-	speed = clampf(speed, 0.0, MAX_MAX_SPEED)
+	speed = clampf(speed, 0.0, _stat(MAX_MAX_SPEED_STAT))
 
 	# The board never slides: the speed goes along the facing (remove_sideways_velocity)
 	if has_forward:
@@ -686,17 +723,17 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 		return
 	if state == State.RAIL:
 		_leave_rail(RAIL_JUMP_REGRIND_TIME)
-		player.velocity += up * lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
+		player.velocity += up * lerpf(OLLIE_MIN_SPEED, _stat(OLLIE_MAX_SPEED_STAT), charge)
 		_ollie_grace = OLLIE_GRACE
 		_play_board("ollie")
 		return
 	if vert_normal != Vector3.ZERO and not player.is_on_floor() and player.velocity.dot(up) < 0.0:
-		player.velocity += vert_normal * lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
+		player.velocity += vert_normal * lerpf(OLLIE_MIN_SPEED, _stat(OLLIE_MAX_SPEED_STAT), charge)
 		vert_out = Vector3.ZERO
 		vert_normal = Vector3.ZERO
 		return
 	var from_vert: bool = player.is_on_floor() and vert_launch_direction(player.get_floor_normal(), up) != Vector3.ZERO
-	var pop: float = lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge) if from_vert else lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
+	var pop: float = lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge) if from_vert else lerpf(OLLIE_MIN_SPEED, _stat(OLLIE_MAX_SPEED_STAT), charge)
 	_end_trick(false)
 	_play_board("ollie")
 	player.velocity += up * (pop - minf(player.velocity.dot(up), 0.0))
@@ -731,7 +768,7 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 		_air_spin_hold += delta
 		var ramp: float = clampf((_air_spin_hold - AIR_NO_ROTATE_TIME) / (AIR_RAMP_ROTATE_TIME - AIR_NO_ROTATE_TIME), 0.0, 1.0)
 		if ramp > 0.0:
-			var turn: float = -motion.x * AIR_SPIN_SPEED * ramp * delta
+			var turn: float = -motion.x * _stat(AIR_SPIN_SPEED_STAT, 1.0) * ramp * delta
 			player.orientation.basis = Basis(up, turn) * player.orientation.basis
 			_spin_tally += rad_to_deg(turn)
 	else:
@@ -773,6 +810,7 @@ func _ray(from: Vector3, to: Vector3) -> Dictionary:
 func _launch(up: Vector3) -> void:
 	_left_ground_at = _now()
 	_air_spin_hold = 0.0
+	_air_tricks = 0
 	_spin_tally = 0.0
 	_landed_from_vert_at = -1.0
 	if balance and trick != "grind":
@@ -887,7 +925,9 @@ func _got_rail(on: Rail, hit: Dictionary) -> void:
 	player.model_pitch = 0.0
 	player.rotate_model_to_direction(direction * rail_sign)
 	_start_trick("grind")
-	var grind: Array = SkateTricks.named(SkateTricks.GRINDS, SkateTricks.direction_of(_digital(player.player_input.motion)))
+	var grind: Array = tricks.special_trick("grind", _recent_taps())
+	if grind.is_empty():
+		grind = SkateTricks.named(SkateTricks.GRINDS, SkateTricks.direction_of(_digital(player.player_input.motion)))
 	tricks.add(grind[0], grind[1])
 	_bank_timer = 0.0
 
@@ -1348,6 +1388,7 @@ func _start_air_trick(kind: String, named: Array) -> void:
 	air_trick = named[0]
 	_air_trick_kind = kind
 	_air_trick_time = 0.0
+	_air_tricks += 1
 	tricks.add(named[0], named[1])
 	_bank_timer = 0.0
 	if kind == "flip":
@@ -1374,19 +1415,17 @@ func _reset_board() -> void:
 		board_pivot.rotation = Vector3.ZERO
 
 
-## Runs the timers behind the combo each tick: the air trick's time, the points a hold earns, and the grace after a
-## landing at whose end the combo is banked.
+## Runs the timers behind the combo each tick: the special meter's drain, the air trick's time, and the grace after
+## a landing at whose end the combo is banked. THUG gives no points for time on a grind or a manual; the reward for
+## holding one is the trick linked on the far side.
 func _tick_tricks(delta: float) -> void:
+	tricks.update(delta)
 	if air_trick != "":
 		_air_trick_time += delta
 		if _air_trick_kind == "grab":
 			var grab: StringName = _action(keyboard_grab_action, pad_grab_action)
-			if Input.is_action_pressed(grab):
-				tricks.hold(delta)
-			elif _air_trick_time >= SkateTricks.GRAB_MIN_TIME:
+			if not Input.is_action_pressed(grab) and _air_trick_time >= SkateTricks.GRAB_MIN_TIME:
 				air_trick = "" # let go: the grab is done and a landing is clean
-	if balance != null:
-		tricks.hold(delta)
 	if _bank_timer > 0.0:
 		_bank_timer -= delta
 		if _bank_timer <= 0.0 and balance == null and state == State.GROUND and not tricks.combo.is_empty():
@@ -1405,7 +1444,7 @@ func _settle_landing(from_vert: bool) -> void:
 		_bail()
 		return
 	air_trick = ""
-	tricks.add_spin(_spin_tally)
+	tricks.add_spin(_spin_tally, _air_tricks > 0)
 	_spin_tally = 0.0
 	_landed_from_vert_at = _now() if from_vert else -1.0
 	if not tricks.combo.is_empty():
@@ -1423,6 +1462,10 @@ func _refresh_hud() -> void:
 	trick_line.text = tricks.combo_text()
 	trick_total.text = tricks.total_text()
 	score_label.text = "SCORE %s" % SkateTricks._with_commas(tricks.score)
+	special_bar.visible = mine
+	special_bar.value = tricks.special / SkateTricks.SPECIAL_FULL
+	special_bar.modulate = SPECIAL_LIT_COLOUR if tricks.special_lit else Color.WHITE
+	special_label.visible = mine and tricks.special_lit
 
 
 # --- Model --------------------------------------------------------------------------------------------------------

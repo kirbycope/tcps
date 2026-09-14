@@ -71,7 +71,7 @@ func test_grind_rising_past_the_coping_is_a_lip_trick_that_stops_the_skater() ->
 	await wait_physics_frames(3)
 	assert_eq(board.state, Skateboard.State.LIP, "Rising past the coping with Grind held is a lip")
 	assert_eq(board.trick, "lip", "with the lip's balance running")
-	assert_eq(board.tricks.combo, ["Axle Stall"], "and the stall in the combo")
+	assert_eq(board.tricks.names(), ["Axle Stall"], "and the stall in the combo")
 	assert_almost_eq(player.velocity, Vector3.ZERO, Vector3.ONE * 0.001, "The skater has stopped dead")
 	assert_almost_eq(player.global_position.y, 3.3, 0.05, "on the coping")
 	var stopped: Vector3 = player.global_position
@@ -123,7 +123,7 @@ func test_grind_on_the_wall_in_the_air_is_a_wall_ride_that_bends_toward_the_grou
 	assert_eq(board.state, Skateboard.State.WALL, "The wall with Grind held is a wall ride")
 	assert_almost_eq(board.wall_normal, Vector3.LEFT, Vector3.ONE * 0.01, "on the wall's face")
 	assert_almost_eq(player.velocity.x, 0.0, 0.05, "The velocity is in the wall's plane")
-	assert_eq(board.tricks.combo, ["Wallride"], "and the ride is in the combo")
+	assert_eq(board.tricks.names(), ["Wallride"], "and the ride is in the combo")
 	var climb: float = player.velocity.y
 	await wait_physics_frames(15)
 	assert_eq(board.state, Skateboard.State.WALL, "still riding a quarter second on")
@@ -145,7 +145,7 @@ func test_ollie_pressed_square_into_the_wall_is_a_wallplant() -> void:
 	while board._wallplant_timer <= 0.0 and frames < 20:
 		await get_tree().physics_frame
 		frames += 1
-	assert_eq(board.tricks.combo, ["Wallplant"], "Ollie at the wall is a wallplant")
+	assert_eq(board.tricks.names(), ["Wallplant"], "Ollie at the wall is a wallplant")
 	assert_gt(board._wallplant_timer, 0.0, "frozen on the wall for a moment")
 	assert_almost_eq(player.velocity, Vector3.ZERO, Vector3.ONE * 0.001)
 	frames = 0
@@ -170,7 +170,7 @@ func test_a_spine_button_rising_on_the_spine_transfers_to_the_far_face() -> void
 		await get_tree().physics_frame
 		frames += 1
 	assert_true(board._transferring, "Above the deck the transfer takes over")
-	assert_eq(board.tricks.combo, ["Spine Transfer"], "and is in the combo")
+	assert_eq(board.tricks.names(), ["Spine Transfer"], "and is in the combo")
 	assert_almost_eq(board._transfer_normal, Vector3.LEFT, Vector3.ONE * 0.01, "aimed at the far face")
 	Input.action_release(&"focus")
 	frames = 0
@@ -192,7 +192,7 @@ func test_a_spine_button_in_plain_air_off_the_deck_is_an_acid_drop_into_the_quar
 		await get_tree().physics_frame
 		frames += 1
 	assert_true(board._transferring, "The drop takes the skater")
-	assert_eq(board.tricks.combo, ["Acid Drop"])
+	assert_eq(board.tricks.names(), ["Acid Drop"])
 	assert_almost_eq(board.vert_normal, Vector3.RIGHT, Vector3.ONE * 0.01, "into the quarter pipe's face")
 	assert_gte(player.velocity.y, Skateboard.ACID_DROP_POP_SPEED - Skateboard.AIR_GRAVITY / 60.0 - 0.01, "with the small pop a drop off an edge gets (less one tick of gravity)")
 	Input.action_release(&"focus")

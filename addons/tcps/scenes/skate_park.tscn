@@ -1,9 +1,10 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="PackedScene" path="res://addons/3d_player_controller/scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://addons/tcps/scenes/skateboard.tscn" id="2_board"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/skate_park.gd" id="3_park"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/rail.gd" id="4_rail"]
+[ext_resource type="Script" path="res://addons/tcps/scripts/path_mover.gd" id="5_mover"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.25, 0.45, 0.8, 1)
@@ -97,6 +98,21 @@ _data = {
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_truck_route"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -20, 0, -33, 0, 0, 0, 0, 0, 0, 20, 0, -33, 0, 0, 0, 0, 0, 0, 20, 0, -28, 0, 0, 0, 0, 0, 0, -20, 0, -28),
+"tilts": PackedFloat32Array(0, 0, 0, 0)
+}
+point_count = 4
+closed = true
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_truck"]
+size = Vector3(2, 1.4, 4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_truck"]
+albedo_color = Color(0.8, 0.25, 0.2, 1)
+roughness = 0.6
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_steel"]
 albedo_color = Color(0.6, 0.62, 0.65, 1)
@@ -265,6 +281,32 @@ script = ExtResource("4_rail")
 curve = SubResource("Curve3D_spine_far")
 script = ExtResource("4_rail")
 
+[node name="TruckRoute" type="Path3D" parent="."]
+curve = SubResource("Curve3D_truck_route")
+
+[node name="TruckFollow" type="PathFollow3D" parent="TruckRoute"]
+rotation_mode = 3
+loop = true
+script = ExtResource("5_mover")
+
+[node name="Truck" type="StaticBody3D" parent="TruckRoute/TruckFollow" groups=["CONCRETE", "skitchable"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TruckRoute/TruckFollow/Truck"]
+shape = SubResource("BoxShape3D_truck")
+
+[node name="Body" type="CSGBox3D" parent="TruckRoute/TruckFollow/Truck"]
+size = Vector3(2, 1.4, 4)
+material = SubResource("StandardMaterial3D_truck")
+
+[node name="Cab" type="CSGBox3D" parent="TruckRoute/TruckFollow/Truck"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, -1)
+size = Vector3(1.8, 0.8, 1.6)
+material = SubResource("StandardMaterial3D_truck")
+
+[node name="SkitchPoint" type="Marker3D" parent="TruckRoute/TruckFollow/Truck"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.7, 3)
+
 [node name="Wall" type="CSGBox3D" parent="." groups=["CONCRETE", "wallride"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 1.5, 25)
 use_collision = true
@@ -294,7 +336,7 @@ offset_right = 300.0
 offset_bottom = 130.0
 grow_horizontal = 2
 horizontal_alignment = 1
-text = "Hold Up to push (hold Ollie or Grab to crouch and push harder), Down to brake or turn sharp. Hold Ollie and let go to pop; Flip or Grab in the air with a direction for the trick, Left/Right to spin. Hold Grind over the ledge, the bench or the handrail and balance with Left/Right; hold it going up past a coping for a lip trick (balance with Up/Down, Ollie out; Up held jumps onto the deck). Tap Up then Down for a manual. Hold Grind into the concrete wall to ride it; press Ollie as you hit it square for a wallplant. Hold Revert rising on the spine to transfer, or in the air off a deck to acid drop. Land clean to bank the combo; Revert on a vert landing to keep it. K steps off."
+text = "Hold Up to push (hold Ollie or Grab to crouch and push harder), Down to brake or turn sharp. Hold Ollie and let go to pop; Flip or Grab in the air with a direction for the trick, Left/Right to spin. Hold Grind over the ledge, the bench or the handrail and balance with Left/Right; hold it going up past a coping for a lip trick (balance with Up/Down, Ollie out; Up held jumps onto the deck). Tap Up then Down for a manual. Hold Grind into the concrete wall to ride it; press Ollie as you hit it square for a wallplant. Hold Revert rising on the spine to transfer, or in the air off a deck to acid drop. Hold Up behind the truck to skitch, balance with Left/Right, Down or Ollie to let go. Land clean to bank the combo; Revert on a vert landing to keep it. K gets off with the board in hand and back on."
 autowrap_mode = 3
 
 [connection signal="timeout" from="MountTimer" to="." method="_on_mount_timer_timeout"]

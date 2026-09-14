@@ -25,12 +25,12 @@ extends Node3D
 signal locomotion_requested(state_path: String, immediate: bool) ## Asks the rider to play an animation node.
 signal locomotion_blend_requested(path: String, value: float) ## Asks the rider to set an animation blend value.
 signal jump_requested ## Asks the rider to run its jump animation (the pop itself is applied here).
-signal trick_started(kind: String) ## A balance trick began ("manual", "nose_manual", "grind", "lip").
+signal trick_started(kind: String) ## A balance trick began ("manual", "nose_manual", "grind", "lip", "skitch").
 signal trick_ended(kind: String, bailed: bool) ## It ended, and whether the needle went off the meter.
 signal combo_banked(points: int) ## A clean landing put the combo into the score.
 signal combo_lost ## A bail threw the combo away.
 
-enum State { GROUND, AIR, RAIL, LIP, WALL } ## LIP is a stall on a coping, WALL a wall ride.
+enum State { GROUND, AIR, RAIL, LIP, WALL, SKITCH } ## LIP is a stall on a coping, WALL a wall ride, SKITCH hanging off a vehicle.
 
 @export_category("Skateboarding Controls")
 @export_group("Keyboard/Mouse Actions")
@@ -168,6 +168,12 @@ const MANUAL_TILT: float = deg_to_rad(25.0) ## How far the model pitches at the 
 const MIN_AIR_TIME: float = 0.1 ## Shorter hops are contact flicker on a steep transition, not a landing to turn for.
 const DISPLAY_NORMAL_SPEED: float = 14.0 ## Per-second rate the display normal drifts to the floor normal, smoothing a ramp's facets (THUG's adjust_normal).
 const SPECIAL_LIT_COLOUR: Color = Color(1.0, 0.85, 0.3) ## The meter's tint while lit.
+const SKITCH_MAX_DISTANCE: float = 120.0 * INCH ## Skitch_Max_Distance: how close to a vehicle's skitch point Up held must be to take it.
+const SKITCH_HOLD_TIME: float = 0.2 ## Skitch_Hold_Time: Up held this long near one (THUG's SKITCH_BUTTON).
+const SKITCH_SUCK_SPEED: float = 200.0 * INCH ## skitch_suck_speed: the pull to the point, over the vehicle's own speed.
+const SKITCH_SPEED_MATCH: float = 1.0 ## skitch_speed_match: the share of the vehicle's velocity the skater takes.
+const SKITCH_LOST_DISTANCE: float = 6.0 ## Metres from the point beyond which the vehicle has got away and the skitch is over.
+const SKITCH_REGRAB_TIME: float = 1.0 ## Seconds after letting go before Up can take a vehicle again (THUG's SkitchOut animation covers this).
 const ACID_DROP_JUMP_VELOCITY: float = 400.0 * INCH ## acid_drop_jump_velocity: a spine button on foot jumps this hard onto the board, to drop into a ramp ahead.
 const CARRY_BONE: String = "RightHand" ## The skater carries the board by this bone of their skeleton while walking.
 const CARRY_OFFSET: Transform3D = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0.0, -0.05, 0.1)) ## Where the board hangs from that bone: deck down along the arm.
@@ -228,6 +234,10 @@ var _sfx_was_on_floor: bool = false
 var _sfx_was_jumping: bool = false
 var _sfx_was_falling: bool = false
 var wall_normal: Vector3 = Vector3.ZERO ## The wall's normal while [member state] is WALL.
+var skitch_point: Node3D ## The vehicle's skitch point the skater hangs off while [member state] is SKITCH.
+var skitch_velocity: Vector3 = Vector3.ZERO ## The vehicle's velocity, measured from its point's movement.
+var _skitch_last_point: Vector3 = Vector3.ZERO
+var _no_skitch_until: float = 0.0 ## On the clock; see SKITCH_REGRAB_TIME.
 var _wallride_ended_at: float = -10.0
 var _grind_pressed_at: float = -10.0
 var _jump_pressed_at: float = -10.0
@@ -361,6 +371,7 @@ func dismount(_player: Player) -> void:
 	_transferring = false
 	_wallplant_timer = 0.0
 	rail = null
+	skitch_point = null
 	state = State.GROUND
 	camera.end()
 	player.floor_max_angle = _saved_floor_max_angle
@@ -575,7 +586,7 @@ func _recent_taps() -> Array:
 func can_ollie() -> bool:
 	if player == null:
 		return false
-	if state == State.RAIL or state == State.LIP or state == State.WALL:
+	if state == State.RAIL or state == State.LIP or state == State.WALL or state == State.SKITCH:
 		return true
 	if _transferring:
 		return false
@@ -639,6 +650,8 @@ func ride(_player: Player, delta: float) -> void:
 		_lip(motion, delta)
 	elif state == State.WALL:
 		_wallride(delta)
+	elif state == State.SKITCH:
+		_skitch(motion, delta)
 	else:
 		var on_floor: bool = player.is_on_floor() and _ollie_grace <= 0.0
 		var normal: Vector3 = player.get_floor_normal() if on_floor else up
@@ -665,7 +678,10 @@ func ride(_player: Player, delta: float) -> void:
 		display_normal = blended_normal.normalized() if blended_normal.length_squared() > 0.0001 else normal
 
 		if on_floor:
-			_roll(motion, sprint, normal, delta)
+			if _up_since >= 0.0 and _clock - _up_since >= SKITCH_HOLD_TIME and _try_skitch():
+				pass # taken: the skitch runs from the next tick
+			else:
+				_roll(motion, sprint, normal, delta)
 		else:
 			_fly(motion, grind_held, up, delta)
 
@@ -801,6 +817,8 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 	var charge: float = clampf(held / MAX_TENSE_TIME, 0.0, 1.0)
 	_last_jump_at = _now()
 	_jump_pressed_at = -10.0 # the press was spent on this pop, not on a wallplant
+	if state == State.SKITCH:
+		_skitch_out() # the pop lets go, with the vehicle's speed
 	if state == State.LIP:
 		_play_board("ollie")
 		_leave_lip(_digital(player.player_input.motion), lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge))
@@ -1432,6 +1450,78 @@ func _finish_transfer() -> void:
 	player.rotate_model_to_direction(vert_normal)
 
 
+# --- Skitching ----------------------------------------------------------------------------------------------------
+
+## Up held on the ground near a vehicle (THUG maybe_skitch): the nearest skitch point within
+## [constant SKITCH_MAX_DISTANCE] of any node in the "skitchable" group is taken. A vehicle's point is a child
+## named SkitchPoint, or the vehicle itself. Returns true when one is taken.
+func _try_skitch() -> bool:
+	if _clock < _no_skitch_until:
+		return false
+	var best: Node3D = null
+	var best_distance: float = SKITCH_MAX_DISTANCE
+	for node: Node in get_tree().get_nodes_in_group("skitchable"):
+		var vehicle: Node3D = node as Node3D
+		if vehicle == null or not vehicle.is_inside_tree() or vehicle == player:
+			continue
+		var point: Node3D = vehicle.get_node_or_null("SkitchPoint") as Node3D
+		if point == null:
+			point = vehicle
+		var distance: float = point.global_position.distance_to(player.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = point
+	if best == null:
+		return false
+	skitch_point = best
+	_skitch_last_point = best.global_position
+	skitch_velocity = Vector3.ZERO
+	state = State.SKITCH
+	_reset_board()
+	air_trick = ""
+	_end_trick(false)
+	_start_trick("skitch")
+	tricks.add(SkateTricks.SKITCH[0], SkateTricks.SKITCH[1])
+	_bank_timer = 0.0
+	return true
+
+
+## Hanging on (THUG's skitch physics): the skater takes the vehicle's velocity and is pulled to its point at
+## [constant SKITCH_SUCK_SPEED] on top, faces the way it travels, and balances on Left and Right with the
+## skitch's own parameters. Down lets go, the meter's end lets go, and a vehicle that gets away is let go of;
+## none of those is a bail (THUG's SkitchOut).
+func _skitch(motion: Vector2, delta: float) -> void:
+	var up: Vector3 = player.up_direction
+	if skitch_point == null or not is_instance_valid(skitch_point) or not skitch_point.is_inside_tree():
+		_skitch_out()
+		return
+	var point: Vector3 = skitch_point.global_position
+	skitch_velocity = (point - _skitch_last_point) / delta
+	_skitch_last_point = point
+	var to_point: Vector3 = (point - player.global_position).slide(up)
+	if to_point.length() > SKITCH_LOST_DISTANCE or motion.y < -0.5 or balance == null or balance.update(delta, motion.x):
+		_skitch_out()
+		return
+	var pull: Vector3 = to_point.limit_length(SKITCH_SUCK_SPEED * delta) / delta
+	player.velocity = skitch_velocity.slide(up) * SKITCH_SPEED_MATCH + pull + up * minf(player.velocity.dot(up), 0.0)
+	var facing: Vector3 = skitch_velocity.slide(up)
+	if facing.length() < 0.5:
+		facing = to_point
+	player.turn_model_toward_direction(facing, delta)
+
+
+## Lets go of the vehicle: the skater rolls on at the speed they had, and the combo waits to be banked.
+func _skitch_out() -> void:
+	if trick == "skitch":
+		_end_trick(false)
+	skitch_point = null
+	skitch_velocity = Vector3.ZERO
+	state = State.GROUND
+	_no_skitch_until = _clock + SKITCH_REGRAB_TIME
+	if not tricks.combo.is_empty():
+		_bank_timer = BANK_GRACE
+
+
 # --- Balance tricks -----------------------------------------------------------------------------------------------
 
 func _start_trick(kind: String) -> void:
@@ -1465,6 +1555,8 @@ func _bail() -> void:
 		_leave_lip(Vector2.ZERO, 0.0)
 	elif state == State.WALL:
 		_leave_wall(true)
+	elif state == State.SKITCH:
+		_skitch_out()
 	player.velocity = player.velocity.slide(player.up_direction) * BAIL_SPEED_SCALE + player.up_direction * minf(player.velocity.dot(player.up_direction), 0.0)
 	_bail_timer = BAIL_TIME
 	_tense_since = -1.0
@@ -1564,7 +1656,7 @@ func _refresh_hud() -> void:
 func surface_up() -> Vector3:
 	if player == null:
 		return Vector3.UP
-	if state == State.RAIL or state == State.LIP or state == State.WALL:
+	if state == State.RAIL or state == State.LIP or state == State.WALL or state == State.SKITCH:
 		return player.up_direction
 	if player.is_on_floor() and _ollie_grace <= 0.0 or _air_time < MIN_AIR_TIME and vert_normal == Vector3.ZERO and not _was_on_floor:
 		return display_normal

@@ -155,3 +155,10 @@ THUG's skater is skitching, walking, and the rest of its trick list.
 THUG's get-off button now leaves the board in the skater's hand, banks the combo and keeps the run's score, and
 the same button gets back on anywhere, the air included; a spine button on foot jumps onto the board for an acid
 drop. The walking is the Player's own. What is left of THUG's skater is skitching and the rest of its trick list.
+
+## Skitching
+
+THUG's skitch: Up held behind a vehicle's skitch point takes it, the skater is pulled to the point and matches
+its speed, balances on the gentlest of THUG's meters, and lets go with Down, the meter's end or a pop, rolling
+on. The park has a truck on a loop for it; a gta vehicle needs only the group and a marker. What is left of
+THUG's skater is the rest of its trick list.

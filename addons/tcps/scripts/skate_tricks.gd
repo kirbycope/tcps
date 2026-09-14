@@ -47,6 +47,7 @@ const SPINE_TRANSFER: Array = ["Spine Transfer", 250] ## TRANSFER_POINTS, for th
 const HIP_TRANSFER: Array = ["Hip Transfer", 250]
 const ACID_DROP: Array = ["Acid Drop", 250] ## ACID_DROP_POINTS.
 const REVERT: Array = ["Revert", 100]
+const SKITCH: Array = ["Skitchin", 500] ## Hanging off the back of a moving vehicle (groundtricks.q).
 const SPECIALS: Dictionary = { ## The three special slots THUG gives a created skater (skater_profile.q): two directions then the button, within SPECIAL_WINDOW, while the meter is lit.
 	"flip": {"taps": ["left", "right"], "trick": ["Kickflip Underflip", 1000]},
 	"grab": {"taps": ["right", "down"], "trick": ["McTwist", 5000]},

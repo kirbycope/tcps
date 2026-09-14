@@ -500,6 +500,17 @@ ground, the latter jumping with `acid_drop_jump_velocity` (400 in/s) first, both
 offsets for rails and lips). Walk speeds: `max_slow_walk_speed` 120, `max_fast_walk_speed` 250,
 `max_slow_run_speed` 500 in/s; `vert_wall_jump_speed` 600.
 
+## 9d. Skitching (`maybe_skitch` `:4738`, `start_skitch` `:8244`, `move_to_skitch_point` `:2211`, `StopSkitch` `:8344`)
+
+`SKITCH_BUTTON` (`skater.h:119`) is Up held longer than `Skitch_Hold_Time` (200 ms); on the ground the nearest
+skitch point of any `CSkitchComponent` within `Skitch_Max_Distance` (120 in) is taken. While skitching the
+velocity is the contact's `* skitch_speed_match` (1.0) and the skater is moved to the skitch point
+(`skitch_suck_speed` 200 in/s); L1/R1/L2/R2 step between a car's points. Balance is `SkitchParams`
+(`Lean_Gravity` 0.01, `Instable_Base` 0.5, `Instable_Rate` 0.04, `Lean_Min_Speed` 5, `Lean_Rnd_Speed` 10,
+`Lean_Acc` 8, bail 4000) on Right/Left, `Tweak 5`; the `Skitch` script scores "Skitchin" 500 and `Display
+Blockspin`. Down held, the meter's end (`OffMeterTop/Bottom`) and an ollie all run `SkitchOut`: `StopSkitch`,
+`LandSkaterTricks`, back to `OnGroundAI`, no bail.
+
 ## 10. What a rewrite must copy, ranked
 
 1. **Velocity is rotated, never projected, through ground transitions**: `RotateToPlane` at the top of every

@@ -76,6 +76,13 @@ class Driver extends Node:
 		{"to": Vector3(10, 0, 25), "kind": "point"},
 		{"to": Vector3(0, 0, 25), "kind": "walk"}, # get off with the board in hand, walk, jump, and get back on in the air
 		{"to": Vector3(-8, 0, 22), "kind": "point"},
+		{"to": Vector3(-22, 0, 26), "kind": "point"}, # west, then down the park's west side to the truck's road at the south end, arriving heading east along its near side (the truck runs east along z = -33)
+		{"to": Vector3(-30, 0, 14), "kind": "point"},
+		{"to": Vector3(-30, 0, -20), "kind": "point"},
+		{"to": Vector3(-38, 0, -30), "kind": "point"},
+		{"to": Vector3(-30, 0, -35), "kind": "point"},
+		{"to": Vector3(30, 0, -35), "kind": "skitch"}, # brake until the truck comes round the corner, push after it holding Up, hang on, pop off
+		{"to": Vector3(10, 0, -20), "kind": "point"},
 	]
 	const REACH: float = 1.5
 
@@ -91,6 +98,8 @@ class Driver extends Node:
 	var _tricked: bool = false
 	var _leg_time: float = 0.0
 	var _started: bool = false
+	var _skitch_since: float = 0.0
+	var _skitch_go: bool = false
 	var _trace: bool = OS.get_environment("TCPS_TRACE") != ""
 
 	func _physics_process(delta: float) -> void:
@@ -111,7 +120,8 @@ class Driver extends Node:
 			print("trace %.2f leg %d on foot pos %s vel %s floor %s motion %s" % [elapsed, leg, _player.global_position, _player.velocity, _player.is_on_floor(), _player.player_input.motion])
 		if _trace and _player.riding is Skateboard:
 			var b: Skateboard = _player.riding as Skateboard
-			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion])
+			var truck_node: Node3D = park.get_node_or_null("TruckRoute/TruckFollow/Truck") as Node3D
+			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s truck %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion, truck_node.global_position if truck_node else Vector3.ZERO])
 		if leg >= LEGS.size():
 			_release_all()
 			finished = true
@@ -129,6 +139,47 @@ class Driver extends Node:
 		var flat: Vector3 = (to - here).slide(Vector3.UP)
 		var kind: String = spec["kind"]
 		var done: bool = false
+		if kind == "skitch":
+			# Roll east beside the road with Up held (THUG's skitch is Up held near a car); once on, ride two
+			# seconds and pop off; the leg is over once the skater is down again
+			var riding_board: Skateboard = _player.riding as Skateboard
+			if riding_board == null:
+				_next_leg()
+				return
+			if riding_board.state == Skateboard.State.SKITCH:
+				if not _tricked:
+					_tricked = true
+					_skitch_since = _leg_time
+				Input.action_release(&"move_up")
+				_release_turn()
+				if _leg_time - _skitch_since > 2.0 and not _ollied:
+					_ollied = true
+					_tap(&"jump")
+			elif not _tricked:
+				# Brake and wait until the truck has come round the south-west corner onto the near lane and is
+				# just ahead; then push after it (crouched, faster than the truck) with Up held for the skitch
+				var truck: Node3D = park.get_node_or_null("TruckRoute/TruckFollow/Truck") as Node3D
+				var truck_ahead: bool = truck != null and truck.global_position.z < -29.5 and truck.global_position.x < -19.0
+				if truck_ahead:
+					_skitch_go = true
+				if not _skitch_go:
+					Input.action_release(&"move_up")
+					Input.action_release(&"sprint")
+					Input.action_press(&"move_down")
+					_release_turn()
+				else:
+					Input.action_release(&"move_down")
+					var heading_now: Vector3 = _player.orientation.basis.z.slide(Vector3.UP).normalized()
+					var angle_now: float = heading_now.signed_angle_to(flat.normalized(), Vector3.UP)
+					if absf(angle_now) > 0.08:
+						_press_turn(signf(angle_now))
+					else:
+						_release_turn()
+					Input.action_press(&"move_up")
+					Input.action_press(&"sprint")
+			if (_tricked and _ollied and on_floor and _leg_time - _skitch_since > 3.0) or _leg_time > 24.0:
+				_next_leg()
+			return
 		if kind == "walk":
 			# Off the board (the dismount action), a second's walk holding forward, a jump, and the same action in
 			# the air to land back on the board; the leg is over once the skater is riding and down again

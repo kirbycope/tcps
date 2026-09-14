@@ -25,12 +25,12 @@ extends Node3D
 signal locomotion_requested(state_path: String, immediate: bool) ## Asks the rider to play an animation node.
 signal locomotion_blend_requested(path: String, value: float) ## Asks the rider to set an animation blend value.
 signal jump_requested ## Asks the rider to run its jump animation (the pop itself is applied here).
-signal trick_started(kind: String) ## A manual or a grind began ("manual", "nose_manual", "grind").
+signal trick_started(kind: String) ## A balance trick began ("manual", "nose_manual", "grind", "lip").
 signal trick_ended(kind: String, bailed: bool) ## It ended, and whether the needle went off the meter.
 signal combo_banked(points: int) ## A clean landing put the combo into the score.
 signal combo_lost ## A bail threw the combo away.
 
-enum State { GROUND, AIR, RAIL }
+enum State { GROUND, AIR, RAIL, LIP, WALL } ## LIP is a stall on a coping, WALL a wall ride.
 
 @export_category("Skateboarding Controls")
 @export_group("Keyboard/Mouse Actions")
@@ -110,8 +110,48 @@ const VERT_ANGLE: float = deg_to_rad(50.0) ## Leaving a floor steeper than this 
 const VERT_TRACK_REACH: float = 1.5 ## Metres behind the skater the wall must still be for vert tracking to hold (THUG's tracking feeler).
 const GROUND_STICK_ANGLE: float = deg_to_rad(30.0) ## Ground_stick_angle: a surface that turns away faster than this in one tick is left behind, which is how the lip of a wall becomes an air rather than a deck.
 const VERT_PUSH_OUT: float = 3.0 * INCH ## Physics_Vert_Push_Out: the skater is held this far off the wall through vert air, so the body clears the coping on the way down.
+const VERT_PUSH_TIME: float = 0.13 ## Skater_vert_push_time: Up must have been held this long at take-off to break vert, so a twitch does not.
 const BREAK_VERT_SPEED_SCALE: float = 0.75 ## physics_break_air_speed_scale: holding forward at the lip breaks vert, and this share of the speed goes over the deck.
 const BREAK_VERT_UP_SCALE: float = 0.75 ## physics_break_air_up_scale: and the climb is trimmed to this.
+const LIP_RAMP_VERT_ANGLE: float = deg_to_rad(68.5) ## LipRampVertAngle: only a rail at the top of a wall this steep is a lip.
+const LIP_SIDE_JUMP_SPEED: float = 200.0 * INCH ## Lip_side_jump_speed: the jump over the deck out of a lip trick.
+const LIP_ALONG_JUMP_SPEED: float = 100.0 * INCH ## Lip_along_jump_speed: the push along the coping dropping back in.
+const LIP_DECK_STEP: float = 0.3 ## Metres onto the deck the jump out of a lip starts from, clear of the coping.
+const WALL_RIDE_GRAVITY: float = 969.0 * INCH ## Wall_Ride_Gravity.
+const WALL_RIDE_MIN_SPEED: float = 75.0 * INCH ## Wall_Ride_Min_Speed: along the wall, or the ride would just go up and down.
+const WALL_RIDE_MAX_INCIDENT_ANGLE: float = deg_to_rad(60.0) ## Wall_Ride_Max_Incident_Angle: squarer than this into the wall is a bonk.
+const WALL_RIDE_TURN_SPEED: float = 0.004 * 60.0 ## Wall_Ride_Turn_Speed, radians a frame at 60: the ride bends toward straight down.
+const WALL_RIDE_DOWN_DOT: float = 0.68 ## Once the ride points this far down it stops bending.
+const WALL_RIDE_TRIANGLE_WINDOW: float = 0.333 ## Wall_Ride_Triangle_Window: a Grind press this long before the wall still counts.
+const WALL_RIDE_DELAY: float = 0.666 ## Wall_Ride_Delay between wall rides.
+const WALL_RIDE_PUSH_OUT: float = 18.0 * INCH ## THUG pushes the skater this far off a wall that ends.
+const WALL_RIDE_REACH: float = 1.0 ## Metres the feeler looks for the wall under the board.
+const WALL_RIDE_JUMP_OUT_SPEED: float = 40.0 * INCH ## Wall_Ride_Jump_Out_Speed.
+const WALL_RIDE_JUMP_UP_SPEED: float = 80.0 * INCH ## Wall_Ride_Jump_Up_Speed.
+const WALLPLANT_WINDOW: float = 0.25 ## Seconds an Ollie press before the wall still counts as the wallplant's press.
+const WALLPLANT_MIN_APPROACH_ANGLE: float = deg_to_rad(20.0) ## Physics_Wallplant_Min_Approach_Angle: shallower is a slide along the wall.
+const WALLPLANT_MIN_HEIGHT: float = 24.0 * INCH ## Physics_Min_Wallplant_Height above the ground.
+const WALLPLANT_SPEED_LOSS: float = 225.0 * INCH ## Physics_Wallplant_Speed_Loss off the reflected speed.
+const WALLPLANT_MIN_EXIT_SPEED: float = 200.0 * INCH ## Physics_Wallplant_Min_Exit_Speed.
+const WALLPLANT_VERTICAL_EXIT_SPEED: float = 500.0 * INCH ## Physics_Wallplant_Vertical_Exit_Speed.
+const WALLPLANT_DISTANCE: float = 27.6 * INCH ## Physics_Wallplant_Distance_From_Wall the skater is set off it.
+const WALLPLANT_DURATION: float = 0.16 ## Physics_Wallplant_Duration: frozen on the wall this long.
+const REWALLPLANT_TIME: float = 1.0 ## Physics_Disallow_Rewallplant_Duration.
+const VERT_FOR_TRANSFERS: float = 0.707 ## A face whose normal's up part is below this is vert to a transfer (45 degrees).
+const TRANSFER_SEARCH_START: float = 10.0 * INCH ## The transfer target search steps over the deck from here...
+const TRANSFER_SEARCH_END: float = 500.0 * INCH ## ...to here...
+const TRANSFER_SEARCH_STEP: float = 6.0 * INCH ## ...in these steps, with a long ray down at each.
+const TRANSFER_DRIFT_WIDTH: float = 24.0 * INCH ## A spine wider than two feet gets no sideways drift, and needs the speed to cross it.
+const TRANSFER_MIN_TIME: float = 0.1 ## Seconds a transfer takes at the least.
+const HIP_DOT: float = -0.866 ## Faces less opposite than this (30 degrees short of facing) make a hip transfer, not a spine.
+const ACID_DROP_SCAN: float = 500.0 * INCH ## How far ahead an acid drop looks for a vert face.
+const ACID_DROP_STEP: float = 3.0 * INCH ## The scan's step...
+const ACID_DROP_NEAR: float = 100.0 * INCH ## ...which grows by 24 in beyond this.
+const ACID_DROP_FAR_STEP: float = 24.0 * INCH
+const ACID_DROP_POP_SPEED: float = 200.0 * INCH ## Physics_Acid_Drop_Pop_Speed: the pop given to a drop off an edge, and twice it the most.
+const ACID_DROP_MIN_AIR_TIME: float = 0.25 ## Physics_Acid_Drop_Min_Air_Time: no drop moments before landing anyway.
+const ACID_DROP_RAISE: float = 24.0 * INCH ## The target is raised this much at a time while something blocks the way.
+const SKATE_OFF_EDGE_TIME: float = 0.25 ## Leaving the ground without a pop this recently is "skated off the edge".
 const MODEL_TILT_SPEED: float = 12.0 ## How fast the model leans onto a transition.
 const AIR_TILT_SPEED: float = 2.5 ## How fast the lean eases back upright over flat air; vert air keeps the wall's lean.
 const MANUAL_TILT: float = deg_to_rad(25.0) ## How far the model pitches at the edge of the meter in a manual.
@@ -162,6 +202,24 @@ var _saved_pivot_height: float = 0.0
 var _sfx_was_on_floor: bool = false
 var _sfx_was_jumping: bool = false
 var _sfx_was_falling: bool = false
+var wall_normal: Vector3 = Vector3.ZERO ## The wall's normal while [member state] is WALL.
+var _wallride_ended_at: float = -10.0
+var _grind_pressed_at: float = -10.0
+var _jump_pressed_at: float = -10.0
+var _last_jump_at: float = -10.0
+var _left_ground_at: float = -10.0
+var _wallplant_timer: float = 0.0 ## Counting down the freeze on the wall.
+var _wallplant_velocity: Vector3 = Vector3.ZERO ## Given back when the freeze ends.
+var _last_wallplant_at: float = -10.0
+var _pre_lip_position: Vector3 = Vector3.ZERO ## Where the skater was when the lip took them, to drop back in from.
+var _lip_rail: Rail
+var _transferring: bool = false ## Crossing a spine, a hip or an acid drop: the horizontal velocity is the transfer's until the target height.
+var _transfer_target: Vector3 = Vector3.ZERO ## The point on the far face the transfer lands at.
+var _transfer_normal: Vector3 = Vector3.ZERO ## That face's horizontal normal.
+var _transfer_velocity: Vector3 = Vector3.ZERO
+var _transfer_lip: float = 0.0 ## The height the far face was found at, where its tracking runs from.
+var _clock: float = 0.0 ## Seconds of physics time on the board; see [method _now].
+var _up_since: float = -1.0 ## When Up went down, on the clock; -1 while it is up. Breaking vert wants it held a while.
 
 @onready var camera: SkateboardCamera = $SkateboardCamera ## The view while ridden (rideable contract).
 @onready var board_pivot: Node3D = $Board ## The mesh hangs off this; the animations turn it.
@@ -352,6 +410,7 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 	var jump: StringName = _action(keyboard_jump_action, pad_jump_action)
 	if event.is_action_pressed(jump) and not is_kick_pushing:
 		_tense_since = _now()
+		_jump_pressed_at = _tense_since
 	elif event.is_action_released(jump) and _tense_since >= 0.0:
 		var held: float = _now() - _tense_since
 		_tense_since = -1.0
@@ -366,6 +425,9 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 			_start_air_trick("flip", SkateTricks.named(SkateTricks.FLIPS, direction))
 		elif event.is_action_pressed(_action(keyboard_grab_action, pad_grab_action)):
 			_start_air_trick("grab", SkateTricks.named(SkateTricks.GRABS, direction))
+
+	if event.is_action_pressed(_action(keyboard_grind_action, pad_grind_action)):
+		_grind_pressed_at = _now()
 
 	# A revert on a vert landing (THUG's L2 and R2): the combo lives on into a manual
 	var reverts: Array[StringName] = keyboard_revert_actions if input_type == Controls.InputType.KEYBOARD_MOUSE else pad_revert_actions
@@ -393,8 +455,10 @@ func ride_input(_player: Player, event: InputEvent) -> void:
 func can_ollie() -> bool:
 	if player == null:
 		return false
-	if state == State.RAIL:
+	if state == State.RAIL or state == State.LIP or state == State.WALL:
 		return true
+	if _transferring:
+		return false
 	if state == State.GROUND or (player.is_on_floor() and _ollie_grace <= 0.0):
 		return true
 	return vert_normal != Vector3.ZERO and player.velocity.dot(player.up_direction) < 0.0
@@ -418,8 +482,10 @@ func _digital(motion: Vector2) -> Vector2:
 		signf(motion.y) if absf(motion.y) > DEAD_ZONE else 0.0)
 
 
-static func _now() -> float:
-	return Time.get_ticks_msec() / 1000.0
+## The board's clock: seconds of physics time ridden, which every window and timer here is measured on, so a
+## slow frame (or the movie writer's) never expires a press early. Stands still while the board is not ridden.
+func _now() -> float:
+	return _clock
 
 
 # --- Physics ------------------------------------------------------------------------------------------------------
@@ -427,9 +493,15 @@ static func _now() -> float:
 ## Rideable contract: moves the rider this physics frame, then the sounds and the camera.
 func ride(_player: Player, delta: float) -> void:
 	var up: Vector3 = player.up_direction
+	_clock += delta
 	_ollie_grace = maxf(_ollie_grace - delta, 0.0)
 	_bail_timer = maxf(_bail_timer - delta, 0.0)
 	var motion: Vector2 = _digital(player.player_input.motion) if _bail_timer <= 0.0 else Vector2.ZERO
+	if motion.y > 0.5:
+		if _up_since < 0.0:
+			_up_since = _clock
+	else:
+		_up_since = -1.0
 	# THUG crouches for the faster push while the ollie button is held; sprint does the same here
 	var sprint: bool = (Input.is_action_pressed(_action(keyboard_sprint_action, pad_sprint_action)) or _tense_since >= 0.0) and not player.is_exhausted and motion.y > 0.0
 	_tick_tricks(delta)
@@ -437,6 +509,10 @@ func ride(_player: Player, delta: float) -> void:
 
 	if state == State.RAIL:
 		_grind(motion, delta)
+	elif state == State.LIP:
+		_lip(motion, delta)
+	elif state == State.WALL:
+		_wallride(delta)
 	else:
 		var on_floor: bool = player.is_on_floor() and _ollie_grace <= 0.0
 		var normal: Vector3 = player.get_floor_normal() if on_floor else up
@@ -471,7 +547,7 @@ func ride(_player: Player, delta: float) -> void:
 	var lean_up: Vector3 = surface_up()
 	_tilt_model(lean_up, MODEL_TILT_SPEED if lean_up != up or state != State.AIR else AIR_TILT_SPEED, delta)
 
-	if state == State.RAIL:
+	if state == State.RAIL or state == State.LIP:
 		_pose_model()
 	else:
 		var intended: Vector3 = player.velocity
@@ -481,8 +557,17 @@ func ride(_player: Player, delta: float) -> void:
 			# transition frame by frame; keep the intended speed along the surface (and any ollie push off it)
 			var floor_normal: Vector3 = player.get_floor_normal()
 			player.velocity = intended.slide(floor_normal) + floor_normal * maxf(intended.dot(floor_normal), 0.0)
-		if player.is_on_wall() and state == State.GROUND:
+		if state == State.WALL:
+			if player.is_on_floor():
+				_leave_wall(false)
+			elif not _wall_still_there():
+				_leave_wall(true)
+			else:
+				_pose_on_wall()
+		elif player.is_on_wall() and state == State.GROUND:
 			_bounce_off_wall(player.get_wall_normal())
+		elif player.is_on_wall() and state == State.AIR and _wallplant_timer <= 0.0:
+			_hit_wall_in_air(intended)
 	if balance_meter:
 		balance_meter.visible = balance != null and player.is_multiplayer_authority()
 		if balance:
@@ -588,6 +673,17 @@ func _bounce_off_wall(wall_normal: Vector3) -> void:
 func _ollie(held: float = MAX_TENSE_TIME) -> void:
 	var up: Vector3 = player.up_direction
 	var charge: float = clampf(held / MAX_TENSE_TIME, 0.0, 1.0)
+	_last_jump_at = _now()
+	_jump_pressed_at = -10.0 # the press was spent on this pop, not on a wallplant
+	if state == State.LIP:
+		_play_board("ollie")
+		_leave_lip(_digital(player.player_input.motion), lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge))
+		return
+	if state == State.WALL:
+		player.velocity += wall_normal * WALL_RIDE_JUMP_OUT_SPEED + up * WALL_RIDE_JUMP_UP_SPEED
+		_leave_wall(false)
+		_play_board("ollie")
+		return
 	if state == State.RAIL:
 		_leave_rail(RAIL_JUMP_REGRIND_TIME)
 		player.velocity += up * lerpf(OLLIE_MIN_SPEED, OLLIE_MAX_SPEED, charge)
@@ -616,8 +712,21 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 ## spin the skater once held past a tap (Physics_Air_No_Rotate_Time, then a ramp); gravity does the rest, and in
 ## vert air the skater is held in the wall's vertical plane (tracking) so nothing carries them over the pipe.
 func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
-	if grind_held and _now() >= _rerail_at and _try_rail():
+	if _wallplant_timer > 0.0:
+		# Frozen on the wall (Physics_Wallplant_Duration), then thrown off it
+		_wallplant_timer -= delta
+		player.velocity = _wallplant_velocity if _wallplant_timer <= 0.0 else Vector3.ZERO
 		return
+	if grind_held and _now() >= _rerail_at:
+		if vert_normal != Vector3.ZERO and player.velocity.dot(up) > 0.0 and last_floor_normal.angle_to(up) > LIP_RAMP_VERT_ANGLE and _try_lip():
+			return
+		if _try_rail():
+			return
+	if _spine_held() and not _transferring:
+		if vert_normal != Vector3.ZERO and player.velocity.dot(up) > 0.0:
+			_try_spine()
+		elif vert_normal == Vector3.ZERO:
+			_try_acid_drop()
 	if motion.x != 0.0:
 		_air_spin_hold += delta
 		var ramp: float = clampf((_air_spin_hold - AIR_NO_ROTATE_TIME) / (AIR_RAMP_ROTATE_TIME - AIR_NO_ROTATE_TIME), 0.0, 1.0)
@@ -628,6 +737,12 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 	else:
 		_air_spin_hold = 0.0
 	var gravity: Vector3 = -up * AIR_GRAVITY
+	if _transferring:
+		if player.velocity.dot(up) < 0.0 and player.global_position.dot(up) < _transfer_target.dot(up):
+			_finish_transfer()
+		else:
+			player.velocity = _transfer_velocity + up * player.velocity.dot(up) + gravity * delta
+			return
 	if vert_normal != Vector3.ZERO and not _wall_still_behind():
 		vert_out = Vector3.ZERO # off the end of the wall: THUG drops tracking and the skater recovers as regular air
 		vert_normal = Vector3.ZERO
@@ -643,15 +758,20 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 ## Whether the wall the skater launched from is still behind them at the launch height (THUG's tracking feeler).
 func _wall_still_behind() -> bool:
 	var from: Vector3 = Vector3(player.global_position.x, _vert_point.y, player.global_position.z) + vert_normal * 0.5
-	var to: Vector3 = from - vert_normal * VERT_TRACK_REACH
+	return not _ray(from, from - vert_normal * VERT_TRACK_REACH).is_empty()
+
+
+## A ray through the world the rider collides with, without the rider.
+func _ray(from: Vector3, to: Vector3) -> Dictionary:
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to, player.collision_mask, [player.get_rid()])
-	return not player.get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+	return player.get_world_3d().direct_space_state.intersect_ray(query)
 
 
 ## Leaving the floor. Off a vert wall the velocity is rotated into the wall's vertical plane with its speed kept and
 ## the plane is remembered for tracking. Holding forward at the lip breaks vert instead: a share of the speed goes
 ## over the deck and it is regular air.
 func _launch(up: Vector3) -> void:
+	_left_ground_at = _now()
 	_air_spin_hold = 0.0
 	_spin_tally = 0.0
 	_landed_from_vert_at = -1.0
@@ -664,7 +784,7 @@ func _launch(up: Vector3) -> void:
 	vert_normal = Vector3.ZERO
 	if out == Vector3.ZERO:
 		return
-	if player.player_input.motion.y > 0.5:
+	if _up_since >= 0.0 and _clock - _up_since >= VERT_PUSH_TIME:
 		var speed: float = player.velocity.length()
 		player.velocity += out * speed * BREAK_VERT_SPEED_SCALE
 		player.velocity -= up * player.velocity.dot(up) * (1.0 - BREAK_VERT_UP_SCALE)
@@ -684,6 +804,7 @@ func _land(normal: Vector3) -> void:
 	var from_vert: bool = vert_normal != Vector3.ZERO
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
+	_transferring = false
 	_air_spin_hold = 0.0
 	_settle_landing(from_vert)
 	var rolling: Vector3 = player.velocity.slide(normal)
@@ -696,10 +817,19 @@ func _land(normal: Vector3) -> void:
 
 # --- Rails --------------------------------------------------------------------------------------------------------
 
-## Looks for a rail along this tick's move (THUG CRailManager::StickToRail): the closest rail within
-## [constant RAIL_MAX_SNAP], scored so one the board travels along beats one across it eight to one. Locks on when
-## one is found and returns true.
+## Looks for a rail along this tick's move and locks on when one is found, returning true.
 func _try_rail() -> bool:
+	var found: Dictionary = _find_rail()
+	if found.is_empty():
+		return false
+	_got_rail(found["rail"], found["hit"])
+	return true
+
+
+## The rail along this tick's move (THUG CRailManager::StickToRail): the closest rail within
+## [constant RAIL_MAX_SNAP], scored so one the board travels along beats one across it eight to one, as
+## [code]{"rail", "hit"}[/code], or empty.
+func _find_rail() -> Dictionary:
 	var up: Vector3 = player.up_direction
 	var from: Vector3 = _old_position
 	var to: Vector3 = player.global_position
@@ -727,9 +857,8 @@ func _try_rail() -> bool:
 			best_rail = candidate
 			best_hit = hit
 	if best_rail == null:
-		return false
-	_got_rail(best_rail, best_hit)
-	return true
+		return {}
+	return {"rail": best_rail, "hit": best_hit}
 
 
 ## Locks onto [param on] at [param hit] (THUG got_rail): the horizontal speed goes along the rail the way the board
@@ -750,6 +879,7 @@ func _got_rail(on: Rail, hit: Dictionary) -> void:
 	state = State.RAIL
 	_was_on_floor = false
 	_air_time = 0.0
+	_transferring = false
 	_reset_board()
 	air_trick = ""
 	player.global_position = hit["point"]
@@ -802,17 +932,382 @@ func _leave_rail(regrind_time: float) -> void:
 		_end_trick(false)
 	rail = null
 	state = State.AIR
-	_air_time = 0.0
+	_air_time = MIN_AIR_TIME # a real air, however short: the landing off it settles, it is not contact flicker
 	_was_on_floor = false
 	_rerail_at = _now() + regrind_time
 	player.global_position += player.up_direction * RAIL_HOP
+
+
+# --- Lips, walls and transfers ------------------------------------------------------------------------------------
+
+## Rising past the coping with Grind held (THUG got_rail's lip branch): a rail at the top of a vert wall is a lip
+## trick rather than a grind. The skater stops dead on the coping, remembers where they were for the drop back in,
+## and the lip's balance starts on Up and Down.
+func _try_lip() -> bool:
+	var found: Dictionary = _find_rail()
+	if found.is_empty():
+		return false
+	var hit: Dictionary = found["hit"]
+	_pre_lip_position = player.global_position
+	_lip_rail = found["rail"]
+	state = State.LIP
+	_was_on_floor = false
+	_air_time = 0.0
+	_transferring = false
+	_reset_board()
+	air_trick = ""
+	_spin_tally = 0.0
+	player.velocity = Vector3.ZERO
+	player.global_position = hit["point"]
+	player.model_pitch = 0.0
+	player.rotate_model_to_direction(vert_normal)
+	_start_trick("lip")
+	var lip: Array = SkateTricks.named(SkateTricks.LIPS, SkateTricks.direction_of(_digital(player.player_input.motion)))
+	tricks.add(lip[0], lip[1])
+	_bank_timer = 0.0
+	return true
+
+
+## On the coping (THUG do_lip_physics): nothing moves, and the balance runs until the pop or the bail.
+func _lip(motion: Vector2, delta: float) -> void:
+	player.velocity = Vector3.ZERO
+	if balance == null or balance.update(delta, motion.y):
+		_bail()
+
+
+## The pop off the coping (THUG HandleLipOllieDirection): with Up held it is a jump over the deck as plain air;
+## with Left or Right held the skater drops back in with a push along the coping; otherwise straight back into
+## the pipe from where they really were, still vert. [param pop] is the upward speed.
+func _leave_lip(motion: Vector2, pop: float) -> void:
+	var up: Vector3 = player.up_direction
+	var coping: Vector3 = player.global_position
+	_end_trick(false)
+	_lip_rail = null
+	state = State.AIR
+	_was_on_floor = false
+	_air_time = MIN_AIR_TIME
+	_rerail_at = _now() + RAIL_JUMP_REGRIND_TIME
+	if motion.y > 0.0 and vert_out != Vector3.ZERO:
+		player.global_position = coping + vert_out * LIP_DECK_STEP
+		player.velocity = vert_out * LIP_SIDE_JUMP_SPEED + up * pop
+		player.rotate_model_to_direction(vert_out)
+		vert_out = Vector3.ZERO
+		vert_normal = Vector3.ZERO
+		return
+	player.global_position = _pre_lip_position
+	_vert_point = _pre_lip_position
+	var along: Vector3 = vert_normal.cross(up) * motion.x
+	player.velocity = along * LIP_ALONG_JUMP_SPEED + up * pop
+
+
+## The body met a wall in the air this tick, travelling at [param intended] (the velocity before the body slid
+## along it): a wallplant with Ollie pressed at the wall, a wall ride with Grind on a ridable wall, otherwise the
+## slide the body already did (THUG's air bonk keeps the climb and projects the rest onto the wall).
+func _hit_wall_in_air(intended: Vector3) -> void:
+	var up: Vector3 = player.up_direction
+	var normal: Vector3 = player.get_wall_normal()
+	if absf(normal.dot(up)) > 0.5:
+		return
+	var collision: KinematicCollision3D = null
+	for i: int in player.get_slide_collision_count():
+		var candidate: KinematicCollision3D = player.get_slide_collision(i)
+		if candidate.get_normal().dot(normal) > 0.9:
+			collision = candidate
+			break
+	if collision == null:
+		return
+	var horizontal_normal: Vector3 = normal.slide(up).normalized()
+	if _try_wallplant(collision, horizontal_normal, intended):
+		return
+	_try_wallride(collision, horizontal_normal, intended)
+
+
+## THUG check_for_wallplant: Ollie pressed as a vertical wall is hit square enough, high enough off the ground.
+## The horizontal speed is reflected and damped, the climb reset to the plant's, the skater set off the wall and
+## frozen there for a moment.
+func _try_wallplant(collision: KinematicCollision3D, normal: Vector3, intended: Vector3) -> bool:
+	var up: Vector3 = player.up_direction
+	var now: float = _now()
+	if now - _jump_pressed_at > WALLPLANT_WINDOW or now - _last_wallplant_at < REWALLPLANT_TIME:
+		return false
+	if not _ray(player.global_position, player.global_position - up * WALLPLANT_MIN_HEIGHT).is_empty():
+		return false
+	var horizontal: Vector3 = intended.slide(up)
+	if horizontal.length() < 0.01 or horizontal.normalized().dot(normal) > -sin(WALLPLANT_MIN_APPROACH_ANGLE):
+		return false
+	var reflected: Vector3 = horizontal - 2.0 * horizontal.dot(normal) * normal
+	var speed: float = maxf(reflected.length() - WALLPLANT_SPEED_LOSS, WALLPLANT_MIN_EXIT_SPEED)
+	_wallplant_velocity = reflected.normalized() * speed + up * WALLPLANT_VERTICAL_EXIT_SPEED
+	_wallplant_timer = WALLPLANT_DURATION
+	_last_wallplant_at = now
+	_tense_since = -1.0
+	var off_wall: float = (player.global_position - collision.get_position()).dot(normal)
+	player.global_position += normal * maxf(WALLPLANT_DISTANCE - off_wall, 0.0)
+	player.velocity = Vector3.ZERO
+	player.rotate_model_to_direction(reflected)
+	_reset_board()
+	air_trick = ""
+	vert_out = Vector3.ZERO
+	vert_normal = Vector3.ZERO
+	_transferring = false
+	tricks.add(SkateTricks.WALLPLANT[0], SkateTricks.WALLPLANT[1])
+	_bank_timer = 0.0
+	return true
+
+
+## THUG check_for_wallride: a wall in the "wallride" group, Grind held or just pressed, long enough since the last
+## ride, enough speed along the wall and not too square into it. The velocity is turned into the wall's plane
+## with its speed kept and the skater rides the wall.
+func _try_wallride(collision: KinematicCollision3D, normal: Vector3, intended: Vector3) -> bool:
+	var up: Vector3 = player.up_direction
+	var collider: Node = collision.get_collider() as Node
+	if collider == null or not collider.is_in_group("wallride"):
+		return false
+	var now: float = _now()
+	if not (Input.is_action_pressed(_action(keyboard_grind_action, pad_grind_action)) or now - _grind_pressed_at <= WALL_RIDE_TRIANGLE_WINDOW):
+		return false
+	if now - _wallride_ended_at < WALL_RIDE_DELAY:
+		return false
+	var horizontal: Vector3 = intended.slide(up)
+	if horizontal.slide(normal).length() < WALL_RIDE_MIN_SPEED:
+		return false
+	if horizontal.length() > 0.01 and absf(horizontal.normalized().dot(normal)) > sin(WALL_RIDE_MAX_INCIDENT_ANGLE):
+		return false
+	wall_normal = normal
+	state = State.WALL
+	_was_on_floor = false
+	_transferring = false
+	vert_out = Vector3.ZERO
+	vert_normal = Vector3.ZERO
+	_reset_board()
+	air_trick = ""
+	_spin_tally = 0.0
+	player.velocity = rotate_to_plane(intended, normal)
+	player.model_pitch = 0.0
+	tricks.add(SkateTricks.WALLRIDE[0], SkateTricks.WALLRIDE[1])
+	_bank_timer = 0.0
+	return true
+
+
+## Riding the wall (THUG do_wallride_physics): the wall's own gravity pulls down the wall, the velocity is kept in
+## the wall's plane and bent toward straight down a little each tick until it points well down; sideways speed is
+## kept, so the ride drifts, and the body follows the velocity.
+func _wallride(delta: float) -> void:
+	var up: Vector3 = player.up_direction
+	var down: Vector3 = (-up).slide(wall_normal).normalized()
+	player.velocity -= up * WALL_RIDE_GRAVITY * delta
+	player.velocity = rotate_to_plane(player.velocity, wall_normal)
+	var speed: float = player.velocity.length()
+	if speed > 0.01:
+		var heading: Vector3 = player.velocity / speed
+		if heading.dot(down) <= WALL_RIDE_DOWN_DOT:
+			var turn: float = WALL_RIDE_TURN_SPEED * delta
+			if heading.cross(down).dot(wall_normal) < 0.0:
+				turn = -turn
+			player.velocity = player.velocity.rotated(wall_normal, turn)
+	player.rotate_model_to_direction(player.velocity)
+
+
+## Whether the wall is still under the board (THUG's down feeler), following it round a curve.
+func _wall_still_there() -> bool:
+	var up: Vector3 = player.up_direction
+	var from: Vector3 = player.global_position + up * 0.3
+	var hit: Dictionary = _ray(from, from - wall_normal * WALL_RIDE_REACH)
+	if hit.is_empty() or absf((hit["normal"] as Vector3).dot(up)) > 0.5:
+		return false
+	wall_normal = (hit["normal"] as Vector3).slide(up).normalized()
+	return true
+
+
+## Off the wall into the air; [param push] sets the skater the wall's push-out off it, as THUG does when the wall
+## ends under them.
+func _leave_wall(push: bool) -> void:
+	state = State.AIR
+	_air_time = MIN_AIR_TIME # so a wall ride that ends on the ground lands and banks, rather than reading as flicker
+	_was_on_floor = false
+	_wallride_ended_at = _now()
+	if push:
+		player.global_position += wall_normal * WALL_RIDE_PUSH_OUT
+
+
+## Stands the model on the wall: its up is the wall's normal and its forward the way it rides, as THUG's matrix is.
+func _pose_on_wall() -> void:
+	var forward: Vector3 = player.velocity
+	if forward.length_squared() < 0.01:
+		forward = (-player.up_direction).slide(wall_normal)
+	forward = forward.normalized()
+	var side: Vector3 = wall_normal.cross(forward)
+	if side.length_squared() < 0.0001:
+		return
+	player.player_model.global_transform.basis = Basis(side.normalized(), wall_normal, forward)
+
+
+## Whether a spine button (the revert buttons, THUG's L2 and R2) is held.
+func _spine_held() -> bool:
+	var actions: Array[StringName] = keyboard_revert_actions if input_type == Controls.InputType.KEYBOARD_MOUSE else pad_revert_actions
+	for action: StringName in actions:
+		if Input.is_action_pressed(action):
+			return true
+	return false
+
+
+## THUG calculate_time_to_reach_height: seconds until a body at [param height] rising at [param vertical_speed]
+## comes back down through [param target_height] under air gravity, or -1 when it never gets that high.
+static func time_to_reach_height(target_height: float, height: float, vertical_speed: float) -> float:
+	var under_root: float = vertical_speed * vertical_speed + 2.0 * AIR_GRAVITY * (height - target_height)
+	if under_root < 0.0:
+		return -1.0
+	return (vertical_speed + sqrt(under_root)) / AIR_GRAVITY
+
+
+## Rising in vert air with a spine button held (THUG maybe_spine_transfer): looks over the deck for another vert
+## face and, once the skater is above the deck and can make it, sends them across to land on it. Left or Right
+## widens the search that way for a hip.
+func _try_spine() -> bool:
+	var up: Vector3 = player.up_direction
+	var found: Dictionary = _look_for_transfer(vert_out, vert_normal)
+	var motion: Vector2 = _digital(player.player_input.motion)
+	if found.is_empty() and motion.x != 0.0:
+		found = _look_for_transfer((vert_out + vert_normal.cross(up) * motion.x).normalized(), vert_normal)
+	if found.is_empty():
+		return false
+	var target: Vector3 = found["point"]
+	var target_normal: Vector3 = found["normal"]
+	var distance: float = (target - _vert_point).slide(up).length()
+	if absf(vert_normal.dot(target_normal)) < 0.9 or distance > TRANSFER_DRIFT_WIDTH:
+		player.velocity = up * player.velocity.length() # no drift: straight up, and across on the transfer's own speed
+	distance += INCH
+	var time: float = maxf(time_to_reach_height(target.dot(up), player.global_position.dot(up), player.velocity.dot(up)), TRANSFER_MIN_TIME)
+	var speed: float = distance / time
+	if distance > TRANSFER_DRIFT_WIDTH and speed * speed > player.velocity.length_squared():
+		return false
+	var level_target: Vector3 = target + up * (player.global_position - target).dot(up)
+	if not _ray(player.global_position, level_target).is_empty():
+		return false # a transfer, but not until the skater is above the deck
+	_enter_transfer(target, target_normal, (level_target - player.global_position) / time, target.dot(up))
+	var trick_: Array = SkateTricks.HIP_TRANSFER if found["hip"] else SkateTricks.SPINE_TRANSFER
+	tricks.add(trick_[0], trick_[1])
+	return true
+
+
+## THUG look_for_transfer_target: steps over the deck along [param search_direction] dropping a long ray at each
+## step, for the first vert face that is not the wall the skater came up ([param start_normal]). Returns
+## [code]{"point", "normal", "hip"}[/code], or empty.
+func _look_for_transfer(search_direction: Vector3, start_normal: Vector3) -> Dictionary:
+	var up: Vector3 = player.up_direction
+	var step: float = TRANSFER_SEARCH_START
+	while step < TRANSFER_SEARCH_END:
+		var from: Vector3 = player.global_position + search_direction * step
+		var hit: Dictionary = _ray(from, from - up * 100.0)
+		if not hit.is_empty():
+			var normal: Vector3 = hit["normal"]
+			if absf(normal.dot(up)) < VERT_FOR_TRANSFERS:
+				var horizontal: Vector3 = normal.slide(up).normalized()
+				var dot: float = start_normal.dot(horizontal)
+				if dot <= 0.95:
+					return {"point": hit["position"], "normal": horizontal, "hip": dot > HIP_DOT}
+		step += TRANSFER_SEARCH_STEP
+	return {}
+
+
+## In plain air with a spine button held (THUG maybe_acid_drop): scans ahead for a vert face whose front is the
+## way the skater travels, and when it is reachable with a clear path, drops the skater into it at its lip. A
+## drop off an edge without a pop gets a small pop first.
+func _try_acid_drop() -> bool:
+	var up: Vector3 = player.up_direction
+	var pos: Vector3 = player.global_position
+	var direction: Vector3 = player.velocity.slide(up)
+	if direction.length() < 0.01:
+		return false
+	direction = direction.normalized()
+	var search: Vector3 = _old_position + up * maxf((pos - _old_position).dot(up), 0.0)
+	var found: Dictionary = {}
+	var distance: float = 0.01 * INCH
+	while distance < ACID_DROP_SCAN:
+		var from: Vector3 = search + direction * distance
+		var hit: Dictionary = _ray(from, from - up * 100.0)
+		if not hit.is_empty():
+			var normal: Vector3 = hit["normal"]
+			if absf(normal.dot(up)) < VERT_FOR_TRANSFERS and normal.slide(up).normalized().dot(direction) >= 0.05:
+				found = hit
+				break
+		distance += ACID_DROP_STEP + (ACID_DROP_FAR_STEP if distance > ACID_DROP_NEAR else 0.0)
+	if found.is_empty():
+		return false
+	var target: Vector3 = found["position"]
+	var lip: float = target.dot(up)
+	var target_normal: Vector3 = (found["normal"] as Vector3).slide(up).normalized()
+	var offset: Vector3 = (target - pos).slide(up)
+	var reach: float = offset.length() * (1.0 if offset.dot(direction) >= 0.0 else -1.0)
+	if absf(reach) > 0.01:
+		direction = offset / reach
+	var vertical: float = player.velocity.dot(up)
+	if _left_ground_at > _last_jump_at and _now() - _left_ground_at < SKATE_OFF_EDGE_TIME:
+		vertical = maxf(vertical, ACID_DROP_POP_SPEED)
+	vertical = minf(vertical, 2.0 * ACID_DROP_POP_SPEED)
+	var height: float = pos.dot(up)
+	var target_height: float = target.dot(up)
+	var horizontal_speed: float = player.velocity.slide(up).length()
+	var final_height: float = height
+	if reach > 0.0 and horizontal_speed > 0.0001:
+		var t: float = reach / horizontal_speed
+		final_height = height + vertical * t - 0.5 * AIR_GRAVITY * t * t
+	if final_height < target_height or time_to_reach_height(target_height, height, vertical) < ACID_DROP_MIN_AIR_TIME:
+		return false
+	# A clear path, in two legs through the halfway point of the drop; the target is raised while something blocks it
+	var clear: bool = false
+	while target_height < final_height:
+		var half: float = 0.5 * time_to_reach_height(target_height, height, vertical)
+		if half <= 0.0:
+			break
+		var halfway: Vector3 = pos + direction * (0.5 * reach) + up * (vertical * half - 0.5 * AIR_GRAVITY * half * half)
+		if _ray(pos, halfway).is_empty() and _ray(halfway, target + up * (target_height - target.dot(up) + INCH)).is_empty():
+			clear = true
+			break
+		target_height += ACID_DROP_RAISE
+	if not clear:
+		return false
+	target += up * (target_height - target.dot(up))
+	player.velocity = up * vertical
+	var time: float = time_to_reach_height(target_height, height, vertical)
+	_enter_transfer(target, target_normal, direction * (reach / time), lip)
+	vert_normal = target_normal # vert air from here, for the camera; tracking starts at the lip
+	vert_out = -vert_normal
+	_spin_tally = 0.0
+	tricks.add(SkateTricks.ACID_DROP[0], SkateTricks.ACID_DROP[1])
+	return true
+
+
+## Starts a transfer: the horizontal velocity is [param velocity] until the skater comes down through
+## [param target]'s height, at the face with [param normal]; [param lip] is the height the face was found at,
+## where its tracking feeler runs afterwards (THUG's true_target_height).
+func _enter_transfer(target: Vector3, normal: Vector3, velocity: Vector3, lip: float) -> void:
+	var up: Vector3 = player.up_direction
+	_transferring = true
+	_transfer_target = target
+	_transfer_lip = lip
+	_transfer_normal = normal.slide(up).normalized()
+	_transfer_velocity = velocity.slide(up)
+	_bank_timer = 0.0
+
+
+## Down through the target height: the transfer's speed is dropped (THUG shrinks it to nothing) and the skater is
+## in vert air on the far face, tracked in its plane at the height the face was found, to land on it.
+func _finish_transfer() -> void:
+	var up: Vector3 = player.up_direction
+	_transferring = false
+	vert_normal = _transfer_normal
+	vert_out = -vert_normal
+	_vert_point = _transfer_target + vert_normal * VERT_PUSH_OUT + up * (_transfer_lip - _transfer_target.dot(up))
+	player.velocity = up * player.velocity.dot(up)
+	player.rotate_model_to_direction(vert_normal)
 
 
 # --- Balance tricks -----------------------------------------------------------------------------------------------
 
 func _start_trick(kind: String) -> void:
 	balance = SkateBalance.new()
-	balance.setup(kind == "grind")
+	balance.setup(kind)
 	trick = kind
 	if SkateTricks.MANUALS.has(kind):
 		var manual: Array = SkateTricks.MANUALS[kind]
@@ -837,6 +1332,10 @@ func _bail() -> void:
 	air_trick = ""
 	tricks.bail()
 	combo_lost.emit()
+	if state == State.LIP:
+		_leave_lip(Vector2.ZERO, 0.0)
+	elif state == State.WALL:
+		_leave_wall(true)
 	player.velocity = player.velocity.slide(player.up_direction) * BAIL_SPEED_SCALE + player.up_direction * minf(player.velocity.dot(player.up_direction), 0.0)
 	_bail_timer = BAIL_TIME
 	_tense_since = -1.0
@@ -933,7 +1432,7 @@ func _refresh_hud() -> void:
 func surface_up() -> Vector3:
 	if player == null:
 		return Vector3.UP
-	if state == State.RAIL:
+	if state == State.RAIL or state == State.LIP or state == State.WALL:
 		return player.up_direction
 	if player.is_on_floor() and _ollie_grace <= 0.0 or _air_time < MIN_AIR_TIME and vert_normal == Vector3.ZERO and not _was_on_floor:
 		return display_normal
@@ -990,12 +1489,12 @@ func get_contextual_controls(input_type_: int) -> Dictionary:
 	return {
 		"left_joystick": "Steer / Balance",
 		"right_joystick": "Camera",
-		"joypad_button_3": "Ollie",
-		"joypad_button_0": "Grind",
+		"joypad_button_3": "Ollie / Wallplant",
+		"joypad_button_0": "Grind / Lip / Wallride",
 		"joypad_button_2": "Flip",
 		"joypad_button_1": "Grab / Push",
-		"joypad_axis_4_plus": "Revert",
-		"joypad_axis_5_plus": "Revert",
+		"joypad_axis_4_plus": "Revert / Transfer",
+		"joypad_axis_5_plus": "Revert / Transfer",
 		"key_k" if input_type_ == Controls.InputType.KEYBOARD_MOUSE else "joypad_button_12": "Dismount",
 	}
 

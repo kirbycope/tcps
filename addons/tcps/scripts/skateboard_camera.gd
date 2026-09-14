@@ -43,6 +43,9 @@ const SIDE_FEELER: float = 0.2 ## 8 in feelers either side of the camera.
 @export var grind_lerp: float = 0.1 ## How fast the roll follows the grind lean ("grind_lerp").
 @export var zoom_lerp: float = 0.0625 ## How fast the zoom moves ("zoom_lerp").
 @export var grind_zoom: float = 1.0 ## Behind is this much of itself on a rail ("grind_zoom"; THUG leaves it at 1).
+@export var big_air_trick_zoom: float = 0.7 ## And this much through a trick in vert air ("big_air_trick_zoom").
+@export var lip_trick_tilt: float = -0.8 ## The frame's tilt through a lip trick ("lip_trick_tilt"): up, from a camera down in the pipe.
+@export var lip_trick_above: float = 0.4 * 0.3048 ## Above through a lip trick ("lip_trick_above").
 @export var lookaround_max: Vector2 = Vector2(deg_to_rad(120.0), deg_to_rad(45.0)) ## Manual look is an offset on the frame (heading, tilt), not a free camera.
 @export var lookaround_return: float = 3.0 ## Per-second rate the offset eases back once the look input stops.
 
@@ -56,6 +59,7 @@ var _landed_timer: float = 0.0
 var _last_dot: float = 1.0
 var _lean: float = 0.0
 var _zoom: float = 1.0
+var _big_air_zoom: bool = false ## Set when a trick starts in vert air, cleared when the vert air ends.
 var _instant: int = 0 ## Ticks left in which the camera snaps rather than eases (after a teleport).
 
 @onready var look_return_timer: Timer = $LookReturnTimer ## Running while the lookaround holds instead of easing back.
@@ -135,15 +139,21 @@ func follow(delta: float) -> void:
 	var on_floor: bool = player.is_on_floor()
 	var state: int = board.get("state")
 	var on_rail: bool = state == Skateboard.State.RAIL
+	var on_lip: bool = state == Skateboard.State.LIP and board.get("vert_out") != Vector3.ZERO
 	var in_air: bool = state == Skateboard.State.AIR
 	var vert_cam: bool = is_vert_cam()
 	var skater_up: Vector3 = board.call("surface_up")
 
-	# The target frame: forward from the travel, up from the skater (world up in plain air)
+	# The target frame: forward from the travel, up from the skater (world up in plain air); through a lip trick
+	# the frame faces over the deck and tilts up by lip_trick_tilt, which drops the camera into the pipe below the
+	# coping, looking up at the skater
 	var forward: Vector3
 	var up_hint: Vector3 = Vector3.UP if in_air and not vert_cam else skater_up
 	var velocity: Vector3 = player.velocity
-	if vert_cam:
+	if on_lip:
+		forward = board.get("vert_out")
+		lookaround = Vector2.ZERO
+	elif vert_cam:
 		forward = -player.up_direction
 		lookaround = Vector2.ZERO
 	elif velocity.slide(Vector3.UP).length() > 0.1:
@@ -166,7 +176,7 @@ func follow(delta: float) -> void:
 		_tilt_addition = maxf(_tilt_addition - TILT_RESTORE * delta, 0.0)
 	target = target.rotated(target.y, lookaround.x)
 	if not vert_cam:
-		target = target.rotated(target.x, -(tilt + _tilt_addition))
+		target = target.rotated(target.x, -((lip_trick_tilt if on_lip else tilt) + _tilt_addition))
 	target = target.rotated(target.x, lookaround.y)
 	if look_return_timer.is_stopped():
 		lookaround = lookaround.move_toward(Vector2.ZERO, lookaround_return * delta)
@@ -205,11 +215,17 @@ func follow(delta: float) -> void:
 		var t_y: float = time_adjusted(vert_air_lerp_y if vert_cam else lerp_y, delta)
 		tripod = Vector3(lerpf(tripod.x, target_pos.x, t_xz), lerpf(tripod.y, target_pos.y, t_y), lerpf(tripod.z, target_pos.z, t_xz))
 
-	# Zoom in a little on a rail; above tends to the perfect height as the zoom closes
-	var target_zoom: float = grind_zoom if on_rail else 1.0
+	# Zoom in through a trick in vert air (THUG CalculateZoom: set when the trick starts, kept until the vert air
+	# ends) and a little on a rail; above tends to the perfect height as the zoom closes
+	if not _big_air_zoom and vert_cam and str(board.get("air_trick")) != "":
+		_big_air_zoom = true
+	elif not vert_cam:
+		_big_air_zoom = false
+	var target_zoom: float = big_air_trick_zoom if _big_air_zoom else (grind_zoom if on_rail else 1.0)
 	_zoom = target_zoom if instantly else _zoom + (target_zoom - _zoom) * time_adjusted(zoom_lerp, delta)
 	var zoomed_behind: float = behind * _zoom
-	var zoomed_above: float = PERFECT_ABOVE + (above - PERFECT_ABOVE) * _zoom if _zoom < 1.0 else above
+	var above_now: float = lip_trick_above if on_lip else above
+	var zoomed_above: float = PERFECT_ABOVE + (above_now - PERFECT_ABOVE) * _zoom if _zoom < 1.0 else above_now
 
 	# Behind the frame, above the skater, aimed at the true skater; the grind lean rolls the view
 	var focus: Vector3 = player.global_position + skater_up * zoomed_above

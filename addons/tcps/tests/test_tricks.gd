@@ -196,7 +196,7 @@ func test_a_manual_out_of_the_landing_keeps_the_combo_and_a_grind_adds_its_name(
 func test_a_revert_in_the_window_keeps_the_combo_after_a_vert_landing() -> void:
 	var tricks: SkateTricks = board.tricks
 	tricks.add("Melon", 100)
-	board._landed_from_vert_at = Skateboard._now()
+	board._landed_from_vert_at = board._now()
 	board._bank_timer = Skateboard.BANK_GRACE
 	board.ride_input(player, _event(&"focus"))
 	assert_has(tricks.combo, "Revert", "Focus within the window after a vert landing is a revert")

@@ -12,6 +12,7 @@ const LEAN_GRAVITY: float = 0.02 * 60.0 ## Lean_Gravity_Stat: how much the lean 
 const INSTABLE_BASE: float = 1.0 ## Instable_Base: the instability the trick starts with.
 const INSTABLE_RATE: float = 0.085 ## Instable_Rate 0.099..0.07 for a manual: how much instability each second on the trick adds.
 const GRIND_INSTABLE_RATE: float = 0.097 ## Instable_Rate 0.104..0.09 for a grind.
+const LIP_INSTABLE_RATE: float = 0.35 ## Instable_Rate 0.5..0.2 for a lip trick: a stall goes wobbly four times as fast as a manual.
 const LEAN_ACC: float = 8.75 * 60.0 * 60.0 / 4096.0 ## Lean_Acc 10 with LEAN_ACC_DIFF 0.75..1.0: what a button does to the needle's speed, per second held.
 const LEAN_MIN_SPEED: float = 5.0 * 60.0 / 4096.0 ## Lean_Min_Speed: below this the needle is given a new push.
 const LEAN_RND_SPEED: float = 20.0 * 60.0 / 4096.0 ## Lean_Rnd_Speed for a manual: the most that push can be.
@@ -28,10 +29,15 @@ var time: float = 0.0 ## Seconds on the trick.
 
 
 ## Starts a trick with the needle a little off centre and already moving away from it, as THUG's SetUp does;
-## a grind ([param grind]) is a little steadier than a manual, as THUG's GrindParams are.
-func setup(grind: bool = false) -> void:
-	rnd_speed = GRIND_RND_SPEED if grind else LEAN_RND_SPEED
-	instable_rate = GRIND_INSTABLE_RATE if grind else INSTABLE_RATE
+## [param kind] picks the parameters: a "grind" is a little steadier than a manual, as THUG's GrindParams are, and
+## a "lip" goes unstable much faster, as its LipParams do; anything else is a manual.
+func setup(kind: String = "manual") -> void:
+	rnd_speed = GRIND_RND_SPEED if kind == "grind" else LEAN_RND_SPEED
+	instable_rate = INSTABLE_RATE
+	if kind == "grind":
+		instable_rate = GRIND_INSTABLE_RATE
+	elif kind == "lip":
+		instable_rate = LIP_INSTABLE_RATE
 	time = 0.0
 	lean = randf_range(-START_RANGE, START_RANGE)
 	if is_zero_approx(lean):

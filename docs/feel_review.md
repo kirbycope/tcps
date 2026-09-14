@@ -133,3 +133,11 @@ Flips and grabs in the air named by the direction held, grinds named the same wa
 landing with THUG's 60 degree slop, reverts on a vert landing, and the combo (points times count) banked on a
 clean landing and lost in a bail, all on the board's HUD as THUG shows it. The remaining gaps to THUG are the
 special meter and special tricks, lip tricks, wall rides and wall plants, and the transfers.
+
+## Lips, walls and transfers
+
+Lip tricks on any coping rail (the half pipe's and the quarter pipe's copings and the spine's two are rails now),
+wall rides and wallplants on the concrete wall, spine transfers over the new spine and acid drops off the quarter
+pipe's deck, which the new bank behind it leads up to; the lip camera drops into the pipe and looks up, and a
+trick in vert air zooms the camera in. What is left of THUG's skater is the special meter and its tricks,
+skitching, and getting off the board to walk.

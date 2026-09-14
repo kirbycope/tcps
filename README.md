@@ -37,7 +37,17 @@ rather than argued about. Neither is a test; both use the demo skate park.
 
 # Print the push, coast, ollie, turn and quarter pipe numbers as JSON
 & 'C:\Godot\godot.exe' --headless --path . -s tools/measure_run.gd
+
+# Trace one leg of the run headless, no film: start at leg 25 with the rider at leg 24's target, printing the
+# board's state, position, velocity and vert wall every tick
+$env:TCPS_FIRST_LEG = 25; $env:TCPS_TRACE = 1
+& 'C:\Godot\godot.exe' --headless --path . -s tools/record_run.gd
 ```
+
+The run's legs are the list at the top of `tools/record_run.gd`: a target to steer at, and what to do on the way
+(an ollie at an x, a flip, a grab, a spin, a grind, a lip trick, a spine transfer, an acid drop, a wallplant).
+A crouched push turns with a four metre radius, so a leg that must arrive at a ramp square needs a straight run-in
+from the leg before it, and a tap's pop comes a third of a second (four and a half metres) after the tap.
 
 `docs/feel_review.md` is the review made with them against Tony Hawk's Underground, and
 `docs/thug_skater_reference.md` is the digest of THUG's skater code it compares against.

@@ -28,6 +28,18 @@ const GRINDS: Dictionary = { ## Triangle in THUG, by the direction held when the
 	"down": ["5-0", 150],
 }
 const MANUALS: Dictionary = {"manual": ["Manual", 100], "nose_manual": ["Nose Manual", 100]}
+const LIPS: Dictionary = { ## Grind at the lip of a vert wall on the way up, by the direction held.
+	"": ["Axle Stall", 250],
+	"left": ["Disaster", 250],
+	"right": ["Blunt To Fakie", 250],
+	"up": ["Rock To Fakie", 200],
+	"down": ["Nose Stall", 200],
+}
+const WALLRIDE: Array = ["Wallride", 250] ## Points for these are THPS-era values; THUG keeps its trick scores in scripts not in the repository.
+const WALLPLANT: Array = ["Wallplant", 400]
+const SPINE_TRANSFER: Array = ["Spine Transfer", 750]
+const HIP_TRANSFER: Array = ["Hip Transfer", 500]
+const ACID_DROP: Array = ["Acid Drop", 500]
 const SPIN_POINTS: Dictionary = {180: 100, 360: 250, 540: 500, 720: 1000, 900: 2000} ## Beyond 900 the last entry stands.
 const SPIN_SLOP: float = 60.0 ## spin_count_slop: a landing this far short of the next half turn still counts it.
 const REVERT_POINTS: int = 25

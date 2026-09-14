@@ -8,10 +8,12 @@ extends SceneTree
 ##
 ##     godot --path . --write-movie run.avi --fixed-fps 60 -s tools/record_run.gd
 ##
-## The run quits on its own when the legs are done or after [constant MAX_SECONDS].
+## The run quits on its own when the legs are done or after [constant MAX_SECONDS]. Two environment variables help
+## when one leg misbehaves: TCPS_FIRST_LEG=n starts at leg n with the rider placed at the previous leg's target,
+## and TCPS_TRACE=1 prints the board's state every tick, which works headless too (no --write-movie needed).
 
 const PARK: String = "res://addons/tcps/scenes/skate_park.tscn"
-const MAX_SECONDS: float = 90.0
+const MAX_SECONDS: float = 180.0
 
 var _driver: Driver
 
@@ -54,6 +56,24 @@ class Driver extends Node:
 		{"to": Vector3(-9, 0, -10), "kind": "air"}, # left wall
 		{"to": Vector3(9, 0, -10), "kind": "air", "ollie": true}, # right wall, pop at the lip
 		{"to": Vector3(0, 0, 0), "kind": "point", "ollie_at_x": -2.0, "spin": 1.0}, # a flat ollie with a 180 on the way out
+		{"to": Vector3(-8, 0, 4), "kind": "point"}, # line up on the quarter pipe again
+		{"to": Vector3(-22, 0, 4), "kind": "air", "lip": true}, # a lip trick on its coping, then drop back in
+		{"to": Vector3(-8, 0, 4), "kind": "point"},
+		{"to": Vector3(-30, 0, 12), "kind": "point"}, # round to the back of the quarter pipe
+		{"to": Vector3(-27, 0, 4), "kind": "point"},
+		{"to": Vector3(-10, 0, 4), "kind": "air", "acid": true}, # up the bank, over the deck and acid drop into the pipe
+		# A crouched push turns with a four metre radius, so each run-in below is a straight line the rider is
+		# already heading along when the leg starts; a tap's pop lands a third of a second (4.5 m) after the tap
+		{"to": Vector3(30, 0, 14), "kind": "point"}, # east across the park, north of the funbox
+		{"to": Vector3(32, 0, 0), "kind": "point"}, # south, to turn west onto the spine's line
+		{"to": Vector3(8, 0, -4), "kind": "air", "spine": true}, # up its near face and transfer to the far one
+		{"to": Vector3(14, 0, 30), "kind": "point"}, # line up on the wall for a wall ride, a shallow angle
+		{"to": Vector3(27, 0, 19), "kind": "air", "ollie_at_x": 22.0, "grind": true}, # ollie into the wall with Grind and ride it
+		{"to": Vector3(24, 0, 11), "kind": "point"}, # south along the wall's line, the turn west ending north of the funbox
+		{"to": Vector3(10, 0, 9), "kind": "point"}, # west, north of the funbox
+		{"to": Vector3(6, 0, 18), "kind": "point"}, # north, west of the bench, to turn east onto the wall's line
+		{"to": Vector3(28, 0, 25), "kind": "air", "ollie_at_x": 17.5, "wallplant": true}, # pop about 22, Ollie again at the wall
+		{"to": Vector3(10, 0, 25), "kind": "point"},
 	]
 	const REACH: float = 1.5
 
@@ -68,6 +88,8 @@ class Driver extends Node:
 	var _manualled: bool = false
 	var _tricked: bool = false
 	var _leg_time: float = 0.0
+	var _started: bool = false
+	var _trace: bool = OS.get_environment("TCPS_TRACE") != ""
 
 	func _physics_process(delta: float) -> void:
 		elapsed += delta
@@ -76,6 +98,16 @@ class Driver extends Node:
 			return
 		if not _player.is_riding:
 			return # the park's MountTimer has not put them on the board yet
+		if not _started:
+			_started = true
+			var first: String = OS.get_environment("TCPS_FIRST_LEG")
+			if first.is_valid_int() and int(first) > 0 and int(first) < LEGS.size():
+				leg = int(first)
+				var at: Vector3 = LEGS[leg - 1]["to"]
+				_player.warp_to(Transform3D(Basis(), Vector3(at.x, 0.1, at.z)))
+		if _trace:
+			var b: Skateboard = _player.riding as Skateboard
+			print("trace %.2f leg %d state %d pos %s vel %s vert %s transfer %s up_since %.2f motion %s" % [elapsed, leg, b.state, _player.global_position, _player.velocity, b.vert_normal, b._transferring, b._up_since, _player.player_input.motion])
 		if leg >= LEGS.size():
 			_release_all()
 			finished = true
@@ -96,7 +128,8 @@ class Driver extends Node:
 		if kind == "point":
 			done = flat.length() < REACH or _leg_time > 12.0
 		else:
-			done = (landed and _leg_time > 0.5) or _leg_time > 12.0
+			var tricked: bool = _tricked or not (spec.has("acid") or spec.has("spine") or spec.has("lip"))
+			done = (landed and _leg_time > 0.5 and tricked) or _leg_time > 14.0
 		if done:
 			_next_leg()
 			return
@@ -108,7 +141,8 @@ class Driver extends Node:
 		var heading: Vector3 = _player.orientation.basis.z.slide(Vector3.UP).normalized()
 		var angle: float = heading.signed_angle_to(flat.normalized(), Vector3.UP)
 		var in_air: bool = not on_floor
-		var on_transition: bool = on_floor and _player.get_floor_normal().y < 0.7
+		var riding: Skateboard = _player.riding as Skateboard
+		var on_transition: bool = on_floor and (_player.get_floor_normal().y < 0.7 or riding.last_floor_normal.y < 0.7)
 		var sharp: bool = on_floor and not on_transition and absf(angle) > deg_to_rad(45.0)
 		if on_transition or in_air or sharp:
 			Input.action_release(&"move_up")
@@ -160,6 +194,33 @@ class Driver extends Node:
 		if spec.get("ollie", false) and not _ollied and on_floor and _player.get_floor_normal().angle_to(Vector3.UP) > deg_to_rad(60.0):
 			_tap(&"jump")
 			_ollied = true
+		var board: Skateboard = _player.riding as Skateboard
+		# A lip: Grind while rising in vert air; once on the coping, let go, hold the stall a second and pop off
+		if spec.has("lip"):
+			if in_air and board.vert_normal != Vector3.ZERO and _player.velocity.y > 0.0 and board.state == Skateboard.State.AIR and not _tricked:
+				Input.action_press(&"action")
+			elif board.state == Skateboard.State.LIP:
+				Input.action_release(&"action")
+				if not _tricked:
+					_tricked = true
+					get_tree().create_timer(1.0, false, true).timeout.connect(_tap.bind(&"jump"))
+			else:
+				Input.action_release(&"action")
+		# A transfer: hold a spine button while rising in vert air; an acid drop: hold it in the air off the deck
+		if spec.has("spine") and in_air and board.vert_normal != Vector3.ZERO:
+			Input.action_press(&"focus")
+			if board._transferring:
+				_tricked = true
+		elif spec.has("acid") and in_air and _left_ground:
+			Input.action_press(&"focus")
+			if board._transferring:
+				_tricked = true
+		elif spec.has("spine") or spec.has("acid"):
+			Input.action_release(&"focus")
+		# A wallplant: press Ollie again as the wall is reached
+		if spec.has("wallplant") and _ollied and in_air and not _tricked and here.x > 23.0:
+			_tricked = true
+			_tap(&"jump")
 
 	func _press_turn(direction: float) -> void:
 		# turn_amount = -motion.x, so move_right (positive x) turns clockwise
@@ -196,7 +257,9 @@ class Driver extends Node:
 		_tricked = false
 		_release_turn()
 		Input.action_release(&"action")
+		Input.action_release(&"focus")
 
 	func _release_all() -> void:
+		Input.action_release(&"focus")
 		for action: StringName in [&"move_up", &"move_down", &"move_left", &"move_right", &"jump", &"sprint", &"action"]:
 			Input.action_release(action)

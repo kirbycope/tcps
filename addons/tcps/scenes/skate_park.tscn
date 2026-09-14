@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="PackedScene" path="res://addons/3d_player_controller/scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://addons/tcps/scenes/skateboard.tscn" id="2_board"]
@@ -59,6 +59,41 @@ point_count = 2
 [sub_resource type="Curve3D" id="Curve3D_bench_back"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, -1, 0.225, 0.25, 0, 0, 0, 0, 0, 0, 1, 0.225, 0.25),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_left_coping"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -6, 3.3, -4, 0, 0, 0, 0, 0, 0, -6, 3.3, 4),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_right_coping"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 6, 3.3, -4, 0, 0, 0, 0, 0, 0, 6, 3.3, 4),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_quarter_coping"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -18, 3.3, 0, 0, 0, 0, 0, 0, 0, -18, 3.3, 8),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_spine_near"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 17, 3.3, -8, 0, 0, 0, 0, 0, 0, 17, 3.3, 0),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_spine_far"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 16.7, 3.3, -8, 0, 0, 0, 0, 0, 0, 16.7, 3.3, 0),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
@@ -196,7 +231,41 @@ script = ExtResource("4_rail")
 curve = SubResource("Curve3D_bench_back")
 script = ExtResource("4_rail")
 
-[node name="Wall" type="CSGBox3D" parent="." groups=["CONCRETE"]]
+[node name="LeftCopingRail" type="Path3D" parent="HalfPipe"]
+curve = SubResource("Curve3D_left_coping")
+script = ExtResource("4_rail")
+
+[node name="RightCopingRail" type="Path3D" parent="HalfPipe"]
+curve = SubResource("Curve3D_right_coping")
+script = ExtResource("4_rail")
+
+[node name="QuarterPipeCoping" type="Path3D" parent="."]
+curve = SubResource("Curve3D_quarter_coping")
+script = ExtResource("4_rail")
+
+[node name="Bank" type="CSGPolygon3D" parent="." groups=["WOOD"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, 8)
+use_collision = true
+polygon = PackedVector2Array(0, 0, 0, 3.3, -6, 0)
+depth = 8.0
+material = SubResource("StandardMaterial3D_wood")
+
+[node name="Spine" type="CSGPolygon3D" parent="." groups=["WOOD"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 0)
+use_collision = true
+polygon = PackedVector2Array(0, 0, -0.157, 0.004, -0.314, 0.016, -0.469, 0.037, -0.624, 0.066, -0.776, 0.102, -0.927, 0.147, -1.075, 0.199, -1.22, 0.259, -1.362, 0.327, -1.5, 0.402, -1.634, 0.484, -1.763, 0.573, -1.888, 0.669, -2.007, 0.771, -2.121, 0.879, -2.229, 0.993, -2.331, 1.112, -2.427, 1.237, -2.516, 1.366, -2.598, 1.5, -2.673, 1.638, -2.741, 1.78, -2.801, 1.925, -2.853, 2.073, -2.898, 2.224, -2.934, 2.376, -2.963, 2.531, -2.984, 2.686, -2.996, 2.843, -3, 3, -3, 3.3, -3.3, 3.3, -3.3, 3, -3.304, 2.843, -3.316, 2.686, -3.337, 2.531, -3.366, 2.376, -3.402, 2.224, -3.447, 2.073, -3.499, 1.925, -3.559, 1.78, -3.627, 1.638, -3.702, 1.5, -3.784, 1.366, -3.873, 1.237, -3.969, 1.112, -4.071, 0.993, -4.179, 0.879, -4.293, 0.771, -4.412, 0.669, -4.537, 0.573, -4.666, 0.484, -4.8, 0.402, -4.938, 0.327, -5.08, 0.259, -5.225, 0.199, -5.373, 0.147, -5.524, 0.102, -5.676, 0.066, -5.831, 0.037, -5.986, 0.016, -6.143, 0.004, -6.3, 0)
+depth = 8.0
+material = SubResource("StandardMaterial3D_wood")
+
+[node name="SpineNearCoping" type="Path3D" parent="."]
+curve = SubResource("Curve3D_spine_near")
+script = ExtResource("4_rail")
+
+[node name="SpineFarCoping" type="Path3D" parent="."]
+curve = SubResource("Curve3D_spine_far")
+script = ExtResource("4_rail")
+
+[node name="Wall" type="CSGBox3D" parent="." groups=["CONCRETE", "wallride"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 1.5, 25)
 use_collision = true
 size = Vector3(0.4, 3, 12)
@@ -222,10 +291,10 @@ anchor_right = 0.5
 offset_left = -300.0
 offset_top = 70.0
 offset_right = 300.0
-offset_bottom = 110.0
+offset_bottom = 130.0
 grow_horizontal = 2
 horizontal_alignment = 1
-text = "Hold Up to push (hold Ollie or Grab to crouch and push harder), Down to brake or turn sharp. Hold Ollie and let go to pop; Flip or Grab in the air with a direction for the trick, Left/Right to spin. Hold Grind over the ledge, the bench or the handrail and balance with Left/Right. Tap Up then Down for a manual. Land clean to bank the combo; Revert on a vert landing to keep it. K steps off."
+text = "Hold Up to push (hold Ollie or Grab to crouch and push harder), Down to brake or turn sharp. Hold Ollie and let go to pop; Flip or Grab in the air with a direction for the trick, Left/Right to spin. Hold Grind over the ledge, the bench or the handrail and balance with Left/Right; hold it going up past a coping for a lip trick (balance with Up/Down, Ollie out; Up held jumps onto the deck). Tap Up then Down for a manual. Hold Grind into the concrete wall to ride it; press Ollie as you hit it square for a wallplant. Hold Revert rising on the spine to transfer, or in the air off a deck to acid drop. Land clean to bank the combo; Revert on a vert landing to keep it. K steps off."
 autowrap_mode = 3
 
 [connection signal="timeout" from="MountTimer" to="." method="_on_mount_timer_timeout"]

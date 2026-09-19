@@ -55,7 +55,7 @@ Getting on puts Tony Hawk's Pro Skater 1 + 2's own face buttons on the Player an
 layout back: **A** ollies, **B** grabs, **X** flips, **Y** grinds, which is that game's Xbox column. Those are
 actions the board already reads (`jump`, `sprint`, `attack`, `action`), so the layout is data rather than
 anything the board does to the `InputMap` itself: it is a `ControlScheme` resource from the player controller,
-`resources/thps_controls.tres`, on the board's `riding_control_scheme` export. Point that at another `.tres` for
+`resources/control_schemes/thps.tres`, on the board's `riding_control_scheme` export. Point that at another `.tres` for
 a different layout, or clear it and the board leaves the Player's controls alone, which is what a game wanting
 one set of controls throughout wants.
 

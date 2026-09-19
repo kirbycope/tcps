@@ -57,7 +57,7 @@ enum State { GROUND, AIR, RAIL, LIP, WALL, SKITCH } ## LIP is a stall on a copin
 ## The pad layout to put on the Player while they are riding, after Tony Hawk's Pro Skater 1 + 2:
 ## A ollie, B grab, X flip, Y grind. Their own layout comes back on dismount. Left empty, the board
 ## leaves the Player's layout alone, which is what a game wanting one set of controls throughout does.
-@export var riding_control_scheme: ControlScheme = preload("res://addons/tcps/resources/thps_controls.tres")
+@export var riding_control_scheme: ControlScheme = preload("res://addons/tcps/resources/control_schemes/thps.tres")
 
 const LOCOMOTION: String = "SkateboardingLocomotion" ## The rider's rolling animation node.
 const KICK_PUSH: String = "SkateboardingKickPush" ## The rider's push-off animation node.

@@ -107,11 +107,14 @@ func test_a_board_another_peer_rides_refuses_a_second_rider() -> void:
 ## them: A ollies, B grabs, X flips, Y grinds. Those are the actions the board already reads, so the layout is a
 ## ControlScheme resource rather than anything the board does to the InputMap itself, and the rider's own layout
 ## comes back the moment they step off.
-func _button_of(action: StringName) -> int:
+## Whether [param action] answers to [param button]. Asked this way rather than "which button is it on", because
+## one GUT run shares one InputMap across every script in it and an action can be left carrying more than one
+## pad button; what matters is that the skating layout put its own button on and took the other one off.
+func _has_button(action: StringName, button: JoyButton) -> bool:
 	for event: InputEvent in InputMap.action_get_events(action):
-		if event is InputEventJoypadButton:
-			return (event as InputEventJoypadButton).button_index
-	return -1
+		if event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == button:
+			return true
+	return false
 
 
 func test_riding_lays_the_pad_out_the_way_tony_hawks_does() -> void:
@@ -123,16 +126,18 @@ func test_riding_lays_the_pad_out_the_way_tony_hawks_does() -> void:
 
 	assert_eq(player.control_scheme, board.riding_control_scheme, "Getting on puts the skating layout up")
 	assert_eq(player.control_scheme.scheme_name, "THPS")
-	assert_eq(_button_of(&"jump"), JOY_BUTTON_A, "A ollies")
-	assert_eq(_button_of(&"sprint"), JOY_BUTTON_B, "B grabs")
-	assert_eq(_button_of(&"attack"), JOY_BUTTON_X, "X flips")
-	assert_eq(_button_of(&"action"), JOY_BUTTON_Y, "Y grinds")
+	assert_true(_has_button(&"jump", JOY_BUTTON_A), "A ollies")
+	assert_true(_has_button(&"sprint", JOY_BUTTON_B), "B grabs")
+	assert_true(_has_button(&"attack", JOY_BUTTON_X), "X flips")
+	assert_true(_has_button(&"action", JOY_BUTTON_Y), "Y grinds")
+	assert_false(_has_button(&"jump", JOY_BUTTON_Y), "and jump came off the button it had on foot")
 
 	board.dismount(player)
 	await wait_physics_frames(2)
 
 	assert_eq(player.control_scheme, walking, "Stepping off gives the rider their own layout back")
-	assert_eq(_button_of(&"jump"), JOY_BUTTON_Y, "and the pad with it")
+	assert_true(_has_button(&"jump", JOY_BUTTON_Y), "and the pad with it")
+	assert_false(_has_button(&"jump", JOY_BUTTON_A), "the ollie button going back to what it was on foot")
 
 
 func test_a_game_can_keep_one_layout_throughout() -> void:

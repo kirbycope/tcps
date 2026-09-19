@@ -119,7 +119,7 @@ func _has_button(action: StringName, button: JoyButton) -> bool:
 
 func test_riding_lays_the_pad_out_the_way_tony_hawks_does() -> void:
 	var walking: ControlScheme = player.control_scheme
-	assert_eq(walking.scheme_name, "Zelda", "On foot the Player has the game's own layout")
+	assert_eq(walking.scheme_name, "TotK", "On foot the Player has the game's own layout")
 
 	board.mount(player)
 	await wait_physics_frames(2)

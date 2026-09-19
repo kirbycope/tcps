@@ -53,6 +53,12 @@ enum State { GROUND, AIR, RAIL, LIP, WALL, SKITCH } ## LIP is a stall on a copin
 @export var pad_sprint_action: StringName = &"sprint"
 @export var pad_kick_push_action: StringName = &"move_up"
 
+@export_group("Control Scheme")
+## The pad layout to put on the Player while they are riding, after Tony Hawk's Pro Skater 1 + 2:
+## A ollie, B grab, X flip, Y grind. Their own layout comes back on dismount. Left empty, the board
+## leaves the Player's layout alone, which is what a game wanting one set of controls throughout does.
+@export var riding_control_scheme: ControlScheme = preload("res://addons/tcps/resources/thps_controls.tres")
+
 const LOCOMOTION: String = "SkateboardingLocomotion" ## The rider's rolling animation node.
 const KICK_PUSH: String = "SkateboardingKickPush" ## The rider's push-off animation node.
 const LOCOMOTION_BLEND_PATH: String = "parameters/LocomotionStateMachine/SkateboardingLocomotion/blend_position"
@@ -231,6 +237,7 @@ var _saved_floor_stop_on_slope: bool = true
 var _saved_floor_block_on_wall: bool = true
 var _saved_floor_constant_speed: bool = true
 var _saved_pivot_height: float = 0.0
+var _saved_control_scheme: ControlScheme = null ## The Player's own layout, put back on dismount.
 var _sfx_was_on_floor: bool = false
 var _sfx_was_jumping: bool = false
 var _sfx_was_falling: bool = false
@@ -318,6 +325,9 @@ func mount(_player: Player) -> void:
 	_saved_floor_block_on_wall = player.floor_block_on_wall
 	_saved_floor_constant_speed = player.floor_constant_speed
 	_saved_pivot_height = player.model_pitch_pivot_height
+	_saved_control_scheme = player.control_scheme
+	if riding_control_scheme:
+		player.control_scheme = riding_control_scheme
 	player.floor_max_angle = RAMP_FLOOR_MAX_ANGLE
 	player.floor_snap_length = RAMP_FLOOR_SNAP_LENGTH
 	player.floor_stop_on_slope = false # a board at rest on a transition rolls back down instead of sticking to it
@@ -381,6 +391,9 @@ func dismount(_player: Player) -> void:
 	player.floor_block_on_wall = _saved_floor_block_on_wall
 	player.floor_constant_speed = _saved_floor_constant_speed
 	player.model_pitch_pivot_height = _saved_pivot_height
+	if riding_control_scheme and _saved_control_scheme:
+		player.control_scheme = _saved_control_scheme
+	_saved_control_scheme = null
 	player.model_pitch = 0.0
 	var drop: Transform3D = Transform3D(Basis(player.up_direction, player.orientation.basis.get_euler().y), player.global_position)
 	if _leave_in_hand:

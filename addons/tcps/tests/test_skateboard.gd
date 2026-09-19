@@ -101,3 +101,45 @@ func test_a_board_another_peer_rides_refuses_a_second_rider() -> void:
 	assert_eq(board.get_parent(), park, "The board never moved")
 	assert_eq(board.rider_peer, RIDER_PEER, "and is still the other rider's")
 	assert_eq(board.get_multiplayer_authority(), Skateboard.SERVER_PEER, "with the authority untouched")
+
+
+## Tony Hawk's Pro Skater 1 + 2 lays the face buttons out its own way, and a board is only worth riding with
+## them: A ollies, B grabs, X flips, Y grinds. Those are the actions the board already reads, so the layout is a
+## ControlScheme resource rather than anything the board does to the InputMap itself, and the rider's own layout
+## comes back the moment they step off.
+func _button_of(action: StringName) -> int:
+	for event: InputEvent in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton:
+			return (event as InputEventJoypadButton).button_index
+	return -1
+
+
+func test_riding_lays_the_pad_out_the_way_tony_hawks_does() -> void:
+	var walking: ControlScheme = player.control_scheme
+	assert_eq(walking.scheme_name, "Zelda", "On foot the Player has the game's own layout")
+
+	board.mount(player)
+	await wait_physics_frames(2)
+
+	assert_eq(player.control_scheme, board.riding_control_scheme, "Getting on puts the skating layout up")
+	assert_eq(player.control_scheme.scheme_name, "THPS")
+	assert_eq(_button_of(&"jump"), JOY_BUTTON_A, "A ollies")
+	assert_eq(_button_of(&"sprint"), JOY_BUTTON_B, "B grabs")
+	assert_eq(_button_of(&"attack"), JOY_BUTTON_X, "X flips")
+	assert_eq(_button_of(&"action"), JOY_BUTTON_Y, "Y grinds")
+
+	board.dismount(player)
+	await wait_physics_frames(2)
+
+	assert_eq(player.control_scheme, walking, "Stepping off gives the rider their own layout back")
+	assert_eq(_button_of(&"jump"), JOY_BUTTON_Y, "and the pad with it")
+
+
+func test_a_game_can_keep_one_layout_throughout() -> void:
+	board.riding_control_scheme = null
+	var walking: ControlScheme = player.control_scheme
+
+	board.mount(player)
+	await wait_physics_frames(2)
+
+	assert_eq(player.control_scheme, walking, "No skating layout set, the board leaves the pad alone")

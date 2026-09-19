@@ -49,6 +49,23 @@ The run's legs are the list at the top of `tools/record_run.gd`: a target to ste
 A crouched push turns with a four metre radius, so a leg that must arrive at a ramp square needs a straight run-in
 from the leg before it, and a tap's pop comes a third of a second (four and a half metres) after the tap.
 
+## The pad while you are riding
+
+Getting on puts Tony Hawk's Pro Skater 1 + 2's own face buttons on the Player and dismounting gives their
+layout back: **A** ollies, **B** grabs, **X** flips, **Y** grinds, which is that game's Xbox column. Those are
+actions the board already reads (`jump`, `sprint`, `attack`, `action`), so the layout is data rather than
+anything the board does to the `InputMap` itself: it is a `ControlScheme` resource from the player controller,
+`resources/thps_controls.tres`, on the board's `riding_control_scheme` export. Point that at another `.tres` for
+a different layout, or clear it and the board leaves the Player's controls alone, which is what a game wanting
+one set of controls throughout wants.
+
+The rest of the pad is unchanged by it: the shoulders keep the revert on the triggers, the left stick turns and
+spins and the right stick moves the camera. The game's other shoulder bindings are not mapped, because the
+board has no action for them yet: L and R turn in the air there, the left trigger breaks out of vert and the
+right trigger switches stance.
+
+Source: <https://support.activision.com/tony-hawks-pro-skater-1-2/articles/controls-and-tricks-in-tony-hawks-pro-skater-1-2>
+
 `docs/feel_review.md` is the review made with them against Tony Hawk's Underground, and
 `docs/thug_skater_reference.md` is the digest of THUG's skater code it compares against.
 

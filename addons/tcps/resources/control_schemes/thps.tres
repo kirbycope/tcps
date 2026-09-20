@@ -9,4 +9,18 @@ action_button_0 = &"jump"
 action_button_1 = &"sprint"
 action_button_2 = &"attack"
 action_button_3 = &"action"
+extra_slots = {
+"axis_4_plus": &"focus",
+"axis_5_plus": &"shoot",
+"button_12": &"whistle"
+}
+slot_labels = {
+"axis_4_plus": "Revert",
+"axis_5_plus": "Stance",
+"button_0": "Jump",
+"button_1": "Grab",
+"button_12": "Walk",
+"button_2": "Flip",
+"button_3": "Grind"
+}
 locks_on = false

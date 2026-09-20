@@ -11,7 +11,7 @@ extends SceneTree
 ## Each measurement starts from the same spot on the open concrete, facing along it, so nothing runs off
 ## the edge of the park.
 
-const PARK: String = "res://addons/tcps/scenes/skate_park.tscn"
+const PARK: String = "res://addons/tcps/scenes/demo/demo.tscn"
 const START: Vector3 = Vector3(-38.0, 0.1, 30.0) ## West edge of the ground, well clear of the ramps.
 const ALONG: Vector3 = Vector3(1.0, 0.0, 0.0) ## Heading east, 76 m of flat ahead.
 

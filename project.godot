@@ -12,7 +12,7 @@ config_version=5
 config/version="3.0.3"
 
 config/name="Tim Cope's Pro Skater"
-run/main_scene="res://addons/tcps/scenes/skate_park.tscn"
+run/main_scene="res://addons/tcps/scenes/demo/demo.tscn"
 config/features=PackedStringArray("4.8", "Forward Plus")
 
 [display]

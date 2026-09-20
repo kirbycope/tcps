@@ -26,98 +26,16 @@ Clone it, open `project.godot` in Godot, and run the demo scene. The addon is mo
 anywhere first. Installing through the Asset Library takes `addons/` and skips the root
 `project.godot` as a conflict, which is why that file can live here harmlessly.
 
-## Filming and measuring the board
+## Installing it in a game
 
-Two scripts in `tools/` put numbers and pictures on how the board plays, so a change to the feel is checked
-rather than argued about. Neither is a test; both use the demo skate park.
-
-```powershell
-# Film a scripted run: an autopilot presses the real actions, Godot's movie writer draws every frame at 60 fps
-& 'C:\Godot\godot.exe' --path . --write-movie run.avi --fixed-fps 60 -s tools/record_run.gd
-
-# Print the push, coast, ollie, turn and quarter pipe numbers as JSON
-& 'C:\Godot\godot.exe' --headless --path . -s tools/measure_run.gd
-
-# Trace one leg of the run headless, no film: start at leg 25 with the rider at leg 24's target, printing the
-# board's state, position, velocity and vert wall every tick
-$env:TCPS_FIRST_LEG = 25; $env:TCPS_TRACE = 1
-& 'C:\Godot\godot.exe' --headless --path . -s tools/record_run.gd
-```
-
-The run's legs are the list at the top of `tools/record_run.gd`: a target to steer at, and what to do on the way
-(an ollie at an x, a flip, a grab, a spin, a grind, a lip trick, a spine transfer, an acid drop, a wallplant, a walk off the board and back on).
-A crouched push turns with a four metre radius, so a leg that must arrive at a ramp square needs a straight run-in
-from the leg before it, and a tap's pop comes a third of a second (four and a half metres) after the tap.
-
-## The pad while you are riding
-
-Getting on puts Tony Hawk's Pro Skater 1 + 2's own face buttons on the Player and dismounting gives their
-layout back: **A** ollies, **B** grabs, **X** flips, **Y** grinds, which is that game's Xbox column. Those are
-actions the board already reads (`jump`, `sprint`, `attack`, `action`), so the layout is data rather than
-anything the board does to the `InputMap` itself: it is a `ControlScheme` resource from the player controller,
-`resources/control_schemes/thps.tres`, on the board's `riding_control_scheme` export. Point that at another `.tres` for
-a different layout, or clear it and the board leaves the Player's controls alone, which is what a game wanting
-one set of controls throughout wants.
-
-The rest of the pad is unchanged by it: the shoulders keep the revert on the triggers, the left stick turns and
-spins and the right stick moves the camera. The game's other shoulder bindings are not mapped, because the
-board has no action for them yet: L and R turn in the air there, the left trigger breaks out of vert and the
-right trigger switches stance.
-
-Source: <https://support.activision.com/tony-hawks-pro-skater-1-2/articles/controls-and-tricks-in-tony-hawks-pro-skater-1-2>
-
-`docs/feel_review.md` is the review made with them against Tony Hawk's Underground, and
-`docs/thug_skater_reference.md` is the digest of THUG's skater code it compares against.
-
-## The vendored addons
-
-`addons/3d_player_controller/` and `addons/controls/` are not part of this repository. They are
-copies taken from their own repositories by `tools/pull_addons.py`, and both are git-ignored here,
-so git sees nothing when one of them changes. `tools/addons.lock.json` records the commit each copy
-came from.
+This repository does not commit the addons it depends on: `addons/3d_player_controller/` and `addons/controls/` are
+fetched, not checked in, so after cloning run
 
 ```bash
-python3 tools/pull_addons.py              # take the latest of every addon
-python3 tools/pull_addons.py --dry-run    # report, change nothing
-git config core.hooksPath .githooks       # once per clone, see below
+python tools/pull_addons.py
 ```
 
-Two guards keep work here from being lost, because it has been lost this way before: hand-tuned
-animation `.tres` files edited in a vendored copy were quietly overwritten by a later pull, and
-nothing said so at the time.
-
-A pull now refuses to overwrite a file that was edited here and never sent upstream. It tells that
-apart from an ordinary upstream change by diffing against the commit the lock file recorded, since a
-file differing only from the incoming commit is just something new arriving:
-
-```
-3d_player_controller         1e11cff  STOPPED: 1 file(s) edited here since the last pull
-                               assets/mixamo/animations/tuned/Swimming.tres
-                             push them first with tools/push_addons.py, or re-run with --force to overwrite
-```
-
-A `pre-push` hook covers the other direction. It runs `tools/push_addons.py --dry-run` and refuses
-to push this project while any addon here differs from its own repository, so the project half and
-the addon half of a change land together instead of one going out alone. Enable it per clone with
-the `git config` line above, and bypass it once with `git push --no-verify`.
-
-`python3 -m unittest tools/test_addon_common.py` covers both guards.
-
-## Textures import Lossless
-
-Every texture here imports with `compress/mode=0` (Lossless) and `detect_3d/compress_to=1`, so the
-editor promotes one to VRAM Compressed the first time it sees it used in 3D. That is Godot's own
-default.
-
-This repository used to force `compress/mode=1` (Lossy) with promotion disabled, project wide. That
-re-encoded every image through WebP at quality 0.7 before Godot saw it, and still uploaded
-uncompressed to VRAM, so it lost real data and bought nothing at run time. It existed only to
-squeeze a built `.pck` under GitHub's 100 MB limit, and nothing built is committed any more.
-
-`python ../godot-3d-player-controller-v3/tools/texture_import_policy.py --root .` puts the
-repository back on that policy, and `--check` reports without writing.
-
-## Installing it in a game
+before opening the project, or nothing loads.
 
 Copy `addons/tcps/` into your project's `addons/`. See the
 [addon's README](addons/tcps/README.md) for what it needs and how to use it.

@@ -12,7 +12,7 @@ extends SceneTree
 ## when one leg misbehaves: TCPS_FIRST_LEG=n starts at leg n with the rider placed at the previous leg's target,
 ## and TCPS_TRACE=1 prints the board's state every tick, which works headless too (no --write-movie needed).
 
-const PARK: String = "res://addons/tcps/scenes/skate_park.tscn"
+const PARK: String = "res://addons/tcps/scenes/demo/demo.tscn"
 const MAX_SECONDS: float = 180.0
 
 var _driver: Driver

@@ -1754,18 +1754,23 @@ static func rotate_to_plane(velocity: Vector3, normal: Vector3) -> Vector3:
 
 
 ## Rideable contract: label names on the Player's controls to their text while skating.
+## Keyed by the actions the board reads for the device, so each word sits on whichever button the layout gives
+## that action: under [member riding_control_scheme] Ollie is A, Grind Y, Flip X and Grab B, Tony Hawk's own
+## pad, and the keyboard set draws each button as its key (Space, E, Alt, Shift; K walks).
 func get_contextual_controls(input_type_: int) -> Dictionary:
-	return {
+	var keyboard: bool = input_type_ == Controls.InputType.KEYBOARD_MOUSE
+	var controls: Dictionary = {
 		"left_joystick": "Steer / Balance",
 		"right_joystick": "Camera",
-		"joypad_button_3": "Ollie / Wallplant",
-		"joypad_button_0": "Grind / Lip / Wallride",
-		"joypad_button_2": "Flip",
-		"joypad_button_1": "Grab / Push",
-		"joypad_axis_4_plus": "Revert / Transfer",
-		"joypad_axis_5_plus": "Revert / Transfer",
-		"key_k" if input_type_ == Controls.InputType.KEYBOARD_MOUSE else "joypad_button_12": "Walk",
+		(keyboard_jump_action if keyboard else pad_jump_action): "Ollie / Wallplant",
+		(keyboard_grind_action if keyboard else pad_grind_action): "Grind / Lip / Wallride",
+		(keyboard_flip_action if keyboard else pad_flip_action): "Flip",
+		(keyboard_grab_action if keyboard else pad_grab_action): "Grab / Push",
+		(keyboard_dismount_action if keyboard else pad_dismount_action): "Walk",
 	}
+	for action: StringName in (keyboard_revert_actions if keyboard else pad_revert_actions):
+		controls[action] = "Revert / Transfer"
+	return controls
 
 
 ## The action for the rider's current input device.

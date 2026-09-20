@@ -3,7 +3,7 @@ extends GutTest
 ## skater's hand rather than on the ground, banks the combo and keeps the run's score; on foot the same action gets
 ## back on, on the ground or in the air; a spine button on foot jumps onto the board, for an acid drop.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

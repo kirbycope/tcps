@@ -6,7 +6,7 @@ extends GutTest
 ## second rider. Offline there is nobody to ask, so the hand-off is immediate, which is what these tests see; the
 ## two-machine scenario in the game project sees it over Steam.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 const RIDER_PEER: int = 7 ## A peer that is not the server, so the hand-off shows.
 
 var park: Node3D
@@ -138,6 +138,32 @@ func test_riding_lays_the_pad_out_the_way_tony_hawks_does() -> void:
 	assert_eq(player.control_scheme, walking, "Stepping off gives the rider their own layout back")
 	assert_true(_has_button(&"jump", JOY_BUTTON_Y), "and the pad with it")
 	assert_false(_has_button(&"jump", JOY_BUTTON_A), "the ollie button going back to what it was on foot")
+
+
+## Each word sits on the button carrying its action under the skating layout, Tony Hawk's own pad: Ollie on A,
+## Grind on Y, Flip on X, Grab on B, Walk on d-pad down, Revert on the triggers.
+func test_the_words_sit_on_the_buttons_that_do_them() -> void:
+	player.controls.current_input_type = Controls.InputType.MICROSOFT
+	player.mount(board)
+	await wait_physics_frames(2)
+
+	var controls: Controls = player.controls
+	assert_eq(controls.joypad_button_0_label.text, "Ollie / Wallplant", "A ollies")
+	assert_eq(controls.joypad_button_3_label.text, "Grind / Lip / Wallride", "Y grinds")
+	assert_eq(controls.joypad_button_2_label.text, "Flip", "X flips")
+	assert_eq(controls.joypad_button_1_label.text, "Grab / Push", "B grabs")
+	assert_eq(controls.joypad_button_12_label.text, "Walk", "D-pad down walks")
+	assert_eq(controls.joypad_axis_4_plus_label.text, "Revert / Transfer")
+	assert_eq(controls.joypad_axis_5_plus_label.text, "Revert / Transfer")
+	assert_eq(controls.left_joystick_label.text, "Steer / Balance")
+
+	controls.current_input_type = Controls.InputType.KEYBOARD_MOUSE
+	await wait_physics_frames(1)
+	assert_eq(controls.action_label(&"jump").text, "Ollie / Wallplant", "Space ollies")
+	assert_eq(controls.action_button(&"jump").texture_normal.resource_path.get_file(), "keyboard_space_icon_outline.svg", "drawn as Space")
+	assert_eq(controls.action_label(&"action").text, "Grind / Lip / Wallride", "E grinds")
+	assert_eq(controls.action_button(&"action").texture_normal.resource_path.get_file(), "keyboard_e_outline.svg", "drawn as E")
+	assert_eq(controls.key_k_label.text, "Walk", "K walks")
 
 
 func test_a_game_can_keep_one_layout_throughout() -> void:

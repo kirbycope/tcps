@@ -4,7 +4,7 @@ extends GutTest
 ## board on the rail with its speed along it plus the boost; the rail ends at its last point; an ollie leaves
 ## it; the grind runs the balance meter and a bail drops the board.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

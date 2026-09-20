@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://addons/3d_player_controller/scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://addons/tcps/scenes/skateboard.tscn" id="2_board"]
-[ext_resource type="Script" path="res://addons/tcps/scripts/skate_park.gd" id="3_park"]
+[ext_resource type="Script" path="res://addons/tcps/scenes/demo/demo.gd" id="3_park"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/rail.gd" id="4_rail"]
 [ext_resource type="Script" path="res://addons/tcps/scripts/path_mover.gd" id="5_mover"]
 

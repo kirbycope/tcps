@@ -4,7 +4,7 @@ extends GutTest
 ## vert air it rides overhead with the skater looking straight down, and swings back behind them on landing;
 ## on a rail it rolls with the lean; its lag is a fixed fraction per sixtieth of a second whatever the frame rate.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

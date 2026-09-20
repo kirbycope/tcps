@@ -1,5 +1,5 @@
 extends Node3D
-## Skate park demo for Tim Cope's Pro Skater: a half pipe, a quarter pipe and a funbox to ride.
+## The skate park demo for Tim Cope's Pro Skater, where every addon keeps its demo (scenes/demo/demo.tscn): a half pipe, a quarter pipe and a funbox to ride.
 ## The MountTimer in the scene puts the Player on the board once the scene has settled.
 
 @export var player: Player

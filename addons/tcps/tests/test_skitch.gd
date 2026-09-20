@@ -3,7 +3,7 @@ extends GutTest
 ## "skitchable" group takes it; the skater is pulled to the point, takes the vehicle's speed and balances on
 ## Left/Right; Down, the meter's end or an ollie lets go without a bail, rolling on at that speed.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

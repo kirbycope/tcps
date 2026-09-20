@@ -5,7 +5,7 @@ extends GutTest
 ## button rising in vert air carries the skater over a spine to its far face; a spine button in plain air drops
 ## them into a vert face ahead.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

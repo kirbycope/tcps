@@ -4,7 +4,7 @@ extends GutTest
 ## the ollie is charged by the hold; a wall is bounced off with the speed scaled by the angle, never ground along;
 ## a manual is two taps and ends in a bail when the meter runs out.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

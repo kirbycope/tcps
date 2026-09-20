@@ -3,7 +3,7 @@ extends GutTest
 ## to the nearest half turn with THUG's slop; a combo sums its tricks and multiplies by their number; a clean
 ## landing banks it, a bail loses it, and a manual, a grind or a revert carries it across a landing.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 var park: Node3D
 var player: Player

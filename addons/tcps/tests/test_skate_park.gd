@@ -4,7 +4,7 @@ extends GutTest
 ## Skateboard rides a half pipe transition like Tony Hawk: up the wall, off the lip with the
 ## outward speed dropped, and back down into the pipe facing the way it rolls.
 
-const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/skate_park.tscn")
+const PARK_SCENE: PackedScene = preload("res://addons/tcps/scenes/demo/demo.tscn")
 
 
 func test_vert_launch_direction_only_off_steep_walls() -> void:

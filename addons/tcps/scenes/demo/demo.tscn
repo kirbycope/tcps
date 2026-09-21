@@ -1,10 +1,10 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://addons/3d_player_controller/scenes/player.tscn" id="1_player"]
-[ext_resource type="PackedScene" path="res://addons/tcps/scenes/skateboard.tscn" id="2_board"]
-[ext_resource type="Script" path="res://addons/tcps/scenes/demo/demo.gd" id="3_park"]
-[ext_resource type="Script" path="res://addons/tcps/scripts/rail.gd" id="4_rail"]
-[ext_resource type="Script" path="res://addons/tcps/scripts/path_mover.gd" id="5_mover"]
+[ext_resource type="PackedScene" uid="uid://ct7n8imyllhbo" path="res://addons/3d_player_controller/scenes/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://drmvyehu4dq43" path="res://addons/tcps/scenes/skateboard.tscn" id="2_board"]
+[ext_resource type="Script" uid="uid://dyhaag6wfae85" path="res://addons/tcps/scenes/demo/demo.gd" id="3_park"]
+[ext_resource type="Script" uid="uid://cw2fmcferaixv" path="res://addons/tcps/scripts/rail.gd" id="4_rail"]
+[ext_resource type="Script" uid="uid://r4cua72jpxi" path="res://addons/tcps/scripts/path_mover.gd" id="5_mover"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.25, 0.45, 0.8, 1)

@@ -25,9 +25,9 @@ func point_at(offset: float) -> Vector3:
 
 ## The world direction of the rail at [param offset], from the start toward the end.
 func direction_at(offset: float) -> Vector3:
-	var len: float = length()
-	var a: Vector3 = to_global(curve.sample_baked(clampf(offset - 0.05, 0.0, len), true))
-	var b: Vector3 = to_global(curve.sample_baked(clampf(offset + 0.05, 0.0, len), true))
+	var total: float = length()
+	var a: Vector3 = to_global(curve.sample_baked(clampf(offset - 0.05, 0.0, total), true))
+	var b: Vector3 = to_global(curve.sample_baked(clampf(offset + 0.05, 0.0, total), true))
 	var direction: Vector3 = b - a
 	return direction.normalized() if direction.length_squared() > 0.000001 else global_basis.x
 

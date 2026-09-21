@@ -644,8 +644,8 @@ func _now() -> float:
 
 ## A stat's value right now: [param range] is its (0, 10) pair, read at the board's stat (5, or 8 with the special
 ## meter lit), in [param unit] (inches unless told otherwise).
-func _stat(range: Vector2, unit: float = INCH) -> float:
-	return lerpf(range.x, range.y, tricks.stat()) * unit
+func _stat(bounds: Vector2, unit: float = INCH) -> float:
+	return lerpf(bounds.x, bounds.y, tricks.stat()) * unit
 
 
 # --- Physics ------------------------------------------------------------------------------------------------------

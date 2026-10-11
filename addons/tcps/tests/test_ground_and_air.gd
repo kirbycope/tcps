@@ -161,3 +161,121 @@ func test_a_tap_in_the_air_does_not_spin_but_a_hold_does() -> void:
 	await wait_physics_frames(24)
 	Input.action_release(&"move_left")
 	assert_gt(player.orientation.basis.z.angle_to(facing_before), deg_to_rad(30.0), "Held, it spins")
+
+
+func _event(action: StringName, pressed: bool = true) -> InputEventAction:
+	var event: InputEventAction = InputEventAction.new()
+	event.action = action
+	event.pressed = pressed
+	return event
+
+
+func test_up_up_then_the_pop_is_a_boneless_and_up_then_the_pop_a_no_comply() -> void:
+	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
+	await wait_physics_frames(2)
+	board.ride_input(player, _event(&"move_up"))
+	board.ride_input(player, _event(&"move_up"))
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	assert_almost_eq(player.velocity.y, lerpf(Skateboard.BONELESS_MAX_SPEED_STAT.x, Skateboard.BONELESS_MAX_SPEED_STAT.y, 0.5) * Skateboard.INCH, 0.01, "Two Up taps then the pop is a boneless: a higher pop (Physics_Boneless_Jump_Speed_Stat)")
+	assert_eq(board.tricks.names(), ["Boneless"], "worth THUG's 250 in the combo")
+	assert_eq(board.tricks.combo_points(), 250)
+	var frames: int = 0
+	while board.state != Skateboard.State.GROUND and frames < 240:
+		await get_tree().physics_frame
+		frames += 1
+	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
+	await wait_physics_frames(2)
+	board.tricks = SkateTricks.new()
+	board.ride_input(player, _event(&"move_up"))
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	assert_almost_eq(player.velocity.y, Skateboard.OLLIE_MAX_SPEED, 0.01, "One Up then the pop is a no comply, at the ollie's own height")
+	assert_eq(board.tricks.names(), ["No Comply"])
+	frames = 0
+	while board.state != Skateboard.State.GROUND and frames < 240:
+		await get_tree().physics_frame
+		frames += 1
+	await _place(Vector3(-20.0, 0.1, 30.0), Vector3.RIGHT, 8.0)
+	await wait_physics_frames(2)
+	board.tricks = SkateTricks.new()
+	board.ride_input(player, _event(&"move_up"))
+	board.ride_input(player, _event(&"move_up"))
+	board._clock += Skateboard.BONELESS_WINDOW + 0.1
+	board._ollie(Skateboard.MAX_TENSE_TIME)
+	assert_eq(board.tricks.names(), [], "Taps older than the window are nothing: a plain ollie")
+	assert_almost_eq(player.velocity.y, Skateboard.OLLIE_MAX_SPEED, 0.01)
+
+
+func test_slow_on_a_steep_slope_the_board_turns_downhill_and_will_not_brake() -> void:
+	# A face 75 degrees from flat, rising toward -x; the rider faces along it (+z), nearly stopped, with Down held
+	var normal: Vector3 = Vector3(sin(deg_to_rad(75.0)), cos(deg_to_rad(75.0)), 0.0)
+	player.orientation.basis = Basis.IDENTITY
+	player.velocity = Vector3(0.0, 0.0, 0.5)
+	assert_almost_eq(player.orientation.basis.z.angle_to(Vector3.RIGHT), PI * 0.5, 0.001, "To start the facing is square across the fall line, which runs downhill to +x")
+	for i: int in 12:
+		board._roll(Vector2(0.0, -1.0), false, normal, 1.0 / 60.0)
+	assert_lt(player.orientation.basis.z.angle_to(Vector3.RIGHT), PI * 0.5 - 0.5, "A fifth of a second on the facing has swung toward downhill at Skater_Slow_Turn_on_slopes")
+	assert_almost_eq(player.orientation.basis.z.y, 0.0, 0.001, "as a yaw: the facing stays level")
+	assert_gt(player.velocity.length(), 0.5, "and Down did not brake: the board slides off the slope")
+	player.orientation.basis = Basis(Vector3.UP, atan2(-1.0, 0.0)) # facing up the face, and climbing it
+	player.velocity = Vector3(-1.6, 6.0, 0.0)
+	for i: int in 5:
+		board._roll(Vector2.ZERO, false, normal, 1.0 / 60.0)
+	assert_almost_eq(player.orientation.basis.z.angle_to(Vector3.RIGHT), PI, 0.001, "A climb is left alone: the turn cannot bend a launch sideways")
+	assert_gt(player.velocity.y, 3.0, "and the board is still climbing")
+	player.orientation.basis = Basis.IDENTITY
+	player.velocity = Vector3(0.0, 0.0, 0.5)
+	for i: int in 12:
+		board._roll(Vector2(0.0, -1.0), false, Vector3.UP, 1.0 / 60.0)
+	assert_almost_eq(player.orientation.basis.z, Vector3.BACK, Vector3.ONE * 0.001, "On the flat the facing is left alone")
+	assert_lt(player.velocity.length(), 0.5, "and Down brakes")
+
+
+func test_grind_held_square_into_a_wall_pushes_the_board_back_off_it() -> void:
+	await _place(Vector3(20.0, 0.1, 25.0), Vector3.RIGHT, 6.0)
+	Input.action_press(&"action")
+	await wait_physics_frames(60)
+	Input.action_release(&"action")
+	assert_lt(player.velocity.x, -1.0, "The wallpush sends the board back the way it came")
+	assert_gt(_speed(), Skateboard.WALLPUSH_MIN_EXIT_SPEED - 0.1, "at no less than Physics_Wallpush_Min_Exit_Speed")
+	assert_lt(player.global_position.x, 24.8, "outside the wall")
+
+
+func test_a_manual_pushed_off_a_wall_comes_back_as_the_other_manual() -> void:
+	seed(3)
+	await _place(Vector3(23.0, 0.1, 25.0), Vector3.RIGHT, 6.0)
+	board._start_trick("manual")
+	assert_eq(board.trick, "manual")
+	Input.action_press(&"action")
+	var frames: int = 0
+	while board.trick == "manual" and frames < 90:
+		await get_tree().physics_frame
+		frames += 1
+	Input.action_release(&"action")
+	assert_eq(board.trick, "nose_manual", "Off the wall the manual carries on as a nose manual (Manual_Wallpush's ToNoseManual)")
+	assert_eq(board.tricks.names(), ["Manual", "Wallpush", "Nose Manual"], "with the push in the combo")
+	assert_lt(player.velocity.x, 0.0, "rolling back the way it came")
+
+
+func test_the_speed_caps_are_lifted_after_a_fast_transfer_and_settle_back() -> void:
+	var soft_cap: float = board._stat(Skateboard.MAX_SPEED_STAT)
+	board._begin_transfer_override(soft_cap * 1.2)
+	assert_eq(board._transfer_override, 1.0, "A transfer ending under 1.25 times the soft cap lifts nothing")
+	board._begin_transfer_override(soft_cap * 2.0)
+	assert_almost_eq(board._transfer_override, Skateboard.TRANSFER_OVERRIDE_MAX, 0.0001, "One ending at twice it lifts the caps to Physics_Transfer_Speed_Limit_Override_Max")
+	player.orientation.basis = Basis.IDENTITY
+	player.velocity = Vector3(0.0, 0.0, soft_cap * 1.7)
+	board._roll(Vector2.ZERO, false, Vector3.UP, 1.0 / 60.0)
+	assert_gt(player.velocity.slide(Vector3.UP).length(), board._stat(Skateboard.MAX_MAX_SPEED_STAT), "and the board keeps a speed over the hard cap")
+	var ticks: int = 0
+	while board._transfer_override > 1.0 and ticks < 600:
+		player.velocity = Vector3(0.0, 0.0, soft_cap * 1.7)
+		board._roll(Vector2.ZERO, false, Vector3.UP, 1.0 / 60.0)
+		ticks += 1
+	assert_almost_eq(ticks / 60.0, (Skateboard.TRANSFER_OVERRIDE_MAX - 1.0) / Skateboard.TRANSFER_OVERRIDE_DROP_RATE, 0.1, "The lift drops by the drop rate each second on the ground")
+	player.velocity = Vector3(0.0, 0.0, soft_cap * 1.7)
+	board._roll(Vector2.ZERO, false, Vector3.UP, 1.0 / 60.0)
+	assert_lte(player.velocity.slide(Vector3.UP).length(), board._stat(Skateboard.MAX_MAX_SPEED_STAT) + 0.001, "and then the hard cap stands again")
+	board._begin_transfer_override(soft_cap * 2.0)
+	player.velocity = Vector3(0.0, 0.0, soft_cap * 0.5)
+	board._roll(Vector2.ZERO, false, Vector3.UP, 1.0 / 60.0)
+	assert_eq(board._transfer_override, 1.0, "Slowing under the cap ends the lift at once: it never raises a speed")

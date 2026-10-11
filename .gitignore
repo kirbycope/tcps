@@ -26,3 +26,8 @@ addons/gut/
 # Python bytecode caches from the scripts in tools/
 __pycache__/
 *.pyc
+/watchdog/
+# Films and screenshots taken while checking the feel; too big and too transient to commit
+/recordings/
+*.avi
+*.mp4

@@ -234,6 +234,51 @@ func test_through_a_lip_trick_the_camera_drops_into_the_pipe_and_looks_up() -> v
 	assert_true(board._ray(camera.global_position, camera.global_position + Vector3.UP * 0.01).is_empty(), "and in the open, not in the ramp")
 
 
+## Vert air on the quarter pipe's face half a metre into the pipe (tracking holds the skater in the wall's plane
+## wherever that plane was taken; against the face the body would touch its top facet), rising fast enough under
+## THUG's 3.5 g for a second and a quarter of air, autoturn on.
+func _vert_air_with_autoturn() -> void:
+	_fly_at(Vector3(-17.5, 3.25, 4.0), Vector3.LEFT, Vector3(0.0, 20.0, 0.0))
+	board.vert_normal = Vector3.RIGHT
+	board.vert_out = Vector3.LEFT
+	board.last_floor_normal = Vector3.RIGHT
+	board._vert_point = player.global_position
+	board._fall_line = Vector3.RIGHT # the launch set it: the facing (into the deck, -x) turned back into the pipe
+	board._autoturn = true
+	board._autoturn_angle = 0.0
+
+
+func test_vert_air_turns_the_skater_to_face_back_down_the_wall_unless_a_spin_is_held() -> void:
+	_vert_air_with_autoturn()
+	await wait_physics_frames(40)
+	assert_eq(board.state, Skateboard.State.AIR, "Two thirds of a second in, still in the air")
+	assert_gt(board._autoturn_angle, 1.5, "and the body has turned most of the way about the wall's normal (Skater_autoturn_speed)")
+	assert_lt(player.player_model.global_transform.basis.z.y, 0.0, "so it is pointing down the wall already")
+	assert_almost_eq(player.orientation.basis.z, Vector3.LEFT, Vector3.ONE * 0.01, "while the facing waits for the turn to finish")
+	assert_eq(board._spin_tally, 0.0, "and it counts for no spin")
+	await wait_physics_frames(30)
+	assert_almost_eq(player.orientation.basis.z, Vector3.RIGHT, Vector3.ONE * 0.01, "A second on the facing is straight down the fall line")
+	assert_false(board._autoturn, "and the turn is done")
+	assert_eq(board._autoturn_angle, 0.0)
+	_vert_air_with_autoturn()
+	Input.action_press(&"move_left")
+	await wait_physics_frames(25)
+	assert_false(board._autoturn, "Left held past skater_autoturn_cancel_time gives the turning to the player")
+	assert_gt(board._spin_tally, 60.0, "who is spinning")
+	Input.action_release(&"move_left")
+
+
+func test_landing_an_acid_drop_slow_is_boosted_to_the_min_land_speed() -> void:
+	_fly_at(Vector3(-20.0, 0.5, 30.0), Vector3.RIGHT, Vector3(3.0, -2.0, 0.0))
+	board._acid_dropping = true
+	board._land(Vector3.UP)
+	assert_almost_eq(player.velocity.slide(Vector3.UP).length(), Skateboard.ACID_DROP_MIN_LAND_SPEED, 0.01, "A drop landed at 3 m/s rolls on at Physics_Acid_Drop_Min_Land_Speed")
+	assert_false(board._acid_dropping, "and the drop is over")
+	_fly_at(Vector3(-20.0, 0.5, 30.0), Vector3.RIGHT, Vector3(3.0, -2.0, 0.0))
+	board._land(Vector3.UP)
+	assert_almost_eq(player.velocity.slide(Vector3.UP).length(), 3.0, 0.01, "A plain landing keeps its speed")
+
+
 func _event(action: StringName, pressed: bool = true) -> InputEventAction:
 	var event: InputEventAction = InputEventAction.new()
 	event.action = action

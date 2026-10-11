@@ -4,8 +4,11 @@ Read from the Tony Hawk's Underground (2003, Neversoft) source at `thug1src/thug
 only `Code/`. `physics.q`, the script file holding nearly every tunable, is not in that tree, but the
 decompiled game scripts are on GitHub at `atljp/thps-modding-resources` under
 `Scripts/THUG/THUG_qb.pre_(decompiled_roq)/game/skater/physics.txt`, and the values the board uses are listed
-in the section "The physics.q values" below. Wherever a value lives there, the symbol is named exactly as the
-C++ reads it (`GetPhysicsFloat(CRCD(..., "Name"))`). Hard-coded numbers are quoted with file and line. Line
+in the section "The physics.q values" below. The PC port at `SwagSoftware/kisak-thug` (a fork of the same
+source) ships the whole `Scripts/` tree as well as `Code/`, so `Scripts/game/skater/physics.q` and the trick
+scripts (`groundtricks.q`, `manualtricks.q`, `walltricks.q`, `tricks.q`) can be read as the game shipped them;
+every value below was checked against it in October 2026 and matched. Wherever a value lives there, the symbol
+is named exactly as the C++ reads it (`GetPhysicsFloat(CRCD(..., "Name"))`). Hard-coded numbers are quoted with file and line. Line
 numbers refer to `Code/Sk/Components/SkaterCorePhysicsComponent.cpp` unless another file is named.
 
 ## The physics.q values
@@ -27,6 +30,12 @@ Inches, inches per second, radians per second and milliseconds, as the C++ reads
 | `Physics_Jump_Speed_min_Stat` / `Physics_Jump_Speed_Stat` | 350 / 414..450 in/s |
 | `Physics_Air_Jump_Speed_min_Stat` / `Physics_Air_Jump_Speed_Stat` | 100 / 275 in/s |
 | `Physics_Boneless_Jump_Speed_min_Stat` / `Physics_Boneless_Jump_Speed_Stat` | 400 / 489..525 in/s |
+| `Physics_Boneless_Air_Jump_Speed_min_Stat` / `Physics_Boneless_Air_Jump_Speed_Stat` | 200 / 264..325 in/s |
+| `Jumptricks` / `Jumptricks0` (`groundtricks.q`) | `TapTwiceRelease Up, X, 500` is `Trick_Boneless` (250; Fastplant and Beanplant are its other animations), `PressAndRelease Up, X, 300` is `NoComply` (100) |
+| `Skater_max_sloped_turn_speed` / `Skater_max_sloped_turn_cosine` / `Skater_Slow_Turn_on_slopes` | 300 in/s / 0.5 / 3.0 rad/s |
+| `Physics_Transfer_Speed_Limit_Override_Max` / `_Drop_Rate` | 1.75 / 0.5 per s (the override starts at 1.25 x `Skater_Max_Speed_Stat`, hard-coded `:3790`) |
+| `Physics_Acid_Drop_Min_Air_Time` / `Physics_Acid_Drop_Min_Land_Speed` / `Physics_Acid_Drop_Pop_Speed` | 0.25 s / 500 in/s / 200 in/s |
+| `Physics_Wallpush_*` (`check_for_wallpush` `:4181`, Triangle held, squarer than `Wall_Bounce_Dont_Slow_Angle` - 1) | speed loss 200, min exit 100 in/s, `Physics_Disallow_Rewallpush_Duration` 800 ms; `Wallpush_Trick` (`walltricks.q`) is 10 points and turns a manual into a nose manual |
 | `Skater_max_tense_time` | 200 ms |
 | `Physics_Air_Rotation_stat` / `Physics_air_tap_turn_speed_stat` | 6.85..7.75 rad/s |
 | `Physics_Air_No_Rotate_Time` / `Physics_Air_Ramp_Rotate_Time` | 100 / 50 ms |
@@ -45,9 +54,10 @@ Inches, inches per second, radians per second and milliseconds, as the C++ reads
 | `Wall_Bounce_Angle_Multiplier` / `Wall_Bounce_Dont_Slow_Angle` / `Wall_Non_Skatable_Angle` | 1.1 / 30 deg / 25 deg |
 | `Wall_Ride_Min_Speed`, `_Max_Incident_Angle`, `_Max_Tilt`, `_Turn_Speed`, `_Jump_Out_Speed`, `_Jump_Up_Speed` | 75 in/s, 60 deg, 68.5 deg, 0.004 rad/frame, 40, 80 in/s |
 | `Physics_Wallplant_*` | approach 20 deg, speed loss 225, min exit 200, vertical exit 500 in/s, min height 24 in, distance 27.6 in, duration 160 ms |
-| `ManualParams` | `Lean_Gravity_Stat` 0.02, `Instable_Rate` 0.099..0.07, `Instable_Base` 1, `Lean_Min_Speed` 5, `Lean_Rnd_Speed` 20, `Lean_Acc` 10 (x 0.75..1.0 by difficulty), `Lean_Bail_Angle` 4000, `Cheese` 700 over 100 frames, `Repeat_Multiplier` 0.25, `Lean_Repeat_Multiplier` 0.8; lean in 4096ths, rates per frame |
-| `GrindParams` | as the manual but `Instable_Rate` 0.104..0.09, `Lean_Rnd_Speed` 7.07..6, `Cheese` 2500 over 30 frames, `Repeat_Multiplier` 0.31..0.1, `Same_Grind_Add_Time` 2 s, `New_Grind_Sub_Time` -0.286..0 |
-| `LipParams` | `Instable_Rate` 0.5..0.2, `Lean_Min_Speed` 10, `Lean_Rnd_Speed` 20, `Cheese` 3000..1000 over 180 frames |
+| `ManualParams` | `Lean_Gravity_Stat` 0.02, `Instable_Rate` 0.099..0.07, `Instable_Base` 1, `Lean_Min_Speed` 5, `Lean_Rnd_Speed` 20, `Lean_Acc` 10 (x 0.75..1.0 by difficulty), `Lean_Bail_Angle` 4000, `Cheese` 700 over 100 frames, `Repeat_Min` 1.0, `Repeat_Multiplier` 0.25, `Lean_Repeat_Multiplier` 0.8; lean in 4096ths, rates per frame |
+| `GrindParams` | as the manual but `Instable_Rate` 0.104..0.09, `Lean_Rnd_Speed` 7.07..6, `Cheese` 2500 over 30 frames, `Repeat_Multiplier` 0.31..0.1, `Lean_Repeat_Multiplier` 0.607..0.5, `Same_Grind_Add_Time` 2 s, `New_Grind_Sub_Time` -0.286..0 |
+| `LipParams` | `Instable_Rate` 0.5..0.2, `Lean_Min_Speed` 10, `Lean_Rnd_Speed` 20, `Cheese` 3000..1000 over 180 frames, `Repeat_Multiplier` 1.0, `Lean_Repeat_Multiplier` 1.0 |
+| `SkitchParams` | `Lean_Gravity_Stat` 0.01, `Instable_Rate` 0.04, `Instable_Base` 0.5, `Lean_Rnd_Speed` 10, `Lean_Acc` 8, `Cheese` 700 over 1 frame |
 | `BalanceSafeButtonPeriod` / `BalanceIgnoreButtonPeriod` | 1000 / 0 ms |
 | `Skater_Camera_Standard_Medium` | `horiz_fov` 72, `behind` 12 ft, `above` 4.3 ft, `tilt` 0.18, `slerp` 0.04, `vert_air_slerp` 0.04, `vert_air_landed_slerp` 0.375, `lerp_xz` 0.25, `lerp_y` 0.75, vert lerps 1.0, `zoom_lerp` 0.0625, `big_air_trick_zoom` 0.7, `grind_zoom` 1.0, `lip_trick_tilt` -0.8, `lip_trick_above` 0.4, `origin_offset` 0.2. Near: behind 7, above 2, slerp 0.08, vert 0.025. Far: behind 14, above 6, tilt 0.3, slerp 0.08 |
 
@@ -342,7 +352,8 @@ neither: |leanDir| < Lean_Min_Speed ? leanDir = rnd(Lean_Rnd_Speed|1) * sign
 anim wobble target = (lean + 4096) / 8192
 ```
 
-`mult` ramps 0..1 over `BalanceSafeButtonPeriod` only when pressing against the lean. `SetUp()`: previous
+`mult` ramps 0..1 over `BalanceSafeButtonPeriod` only when pressing toward the lean (A with `lean < 0`, B with
+`lean > 0`: the way that makes it worse, so a button held from the start cannot throw the needle). `SetUp()`: previous
 `leanDir` reused `* Repeat_Multiplier`, floored to `Repeat_Min` (manual falls +, nose manual -, grind
 random); `lean *= Lean_Repeat_Multiplier; lean += cheese * sign(lean)`; if already past bail, clamp to 90%
 and bail next frame (the "cheese" anti-spam); `cheese = Cheese`. Same rail again in a combo:
@@ -654,4 +665,5 @@ Key finding for the port: **the C++ contains no landing tolerance, no push impul
 and no terminal velocity**; those "feel" behaviours the community attributes to THPS are the
 rotate-not-project velocity handling, the digital-input ramps on hold time, the rail scoring bias, and
 script-side decisions on top of a physics layer that never refuses a landing. The full `physics.q` numbers
-would have to come from a game data dump; every symbol above is the exact key to look up there.
+are in the table at the top, from the decompiled scripts and the `Scripts/` tree in `kisak-thug`; every
+symbol above is the exact key to look up there.

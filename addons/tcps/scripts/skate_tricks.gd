@@ -93,8 +93,11 @@ const DOUBLE_TAPS: Dictionary = { ## Two taps of one direction then the button (
 	"grind": {"up,up": ["Nosebluntslide", 250], "down,down": ["Bluntslide", 250]},
 }
 const OLLIE: Array = ["Ollie", 75] ## What a spin with no trick in the air attaches to.
+const BONELESS: Array = ["Boneless", 250] ## Trick_Boneless: Up tapped twice then the pop (groundtricks.q's Jumptricks).
+const NO_COMPLY: Array = ["No Comply", 100] ## Jumptricks0: Up then the pop.
 const WALLRIDE: Array = ["Wallride", 200]
 const WALLPLANT: Array = ["Wallplant", 750]
+const WALLPUSH: Array = ["Wallpush", 10] ## Wallpush_Trick: a manual pushed off a wall with Grind, back out the other way.
 const SPINE_TRANSFER: Array = ["Spine Transfer", 250] ## TRANSFER_POINTS, for the hip too.
 const HIP_TRANSFER: Array = ["Hip Transfer", 250]
 const ACID_DROP: Array = ["Acid Drop", 250] ## ACID_DROP_POINTS.

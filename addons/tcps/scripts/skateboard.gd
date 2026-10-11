@@ -109,6 +109,22 @@ const VERT_HANG: float = 1.1 ## Physics_Vert_hang_Stat: a touch floatier in vert
 const AIR_SPIN_SPEED: float = 7.3 ## Physics_Air_Rotation_stat 6.85..7.75: radians per second with Left or Right held in the air.
 const AIR_NO_ROTATE_TIME: float = 0.1 ## Physics_Air_No_Rotate_Time: a tap does not spin.
 const AIR_RAMP_ROTATE_TIME: float = 0.15 ## Physics_Air_No_Rotate_Time plus Physics_Air_Ramp_Rotate_Time: the spin reaches full rate at this hold.
+const AUTOTURN_SPEED: float = 3.0 ## Skater_autoturn_speed: radians per second the skater turns to face down the wall in vert air with no spin held.
+const AUTOTURN_CANCEL_TIME: float = 0.3 ## skater_autoturn_cancel_time: Left or Right held this long gives the air's turning to the player.
+const STEEP_SLOPE_MAX_SPEED: float = 300.0 * INCH ## Skater_max_sloped_turn_speed: slower than this on a steep slope the board turns downhill instead of braking.
+const STEEP_SLOPE_COSINE: float = 0.5 ## Skater_max_sloped_turn_cosine: a slope is steep when its normal's up part is below this (60 degrees).
+const STEEP_SLOPE_TURN_RATE: float = 3.0 ## Skater_Slow_Turn_on_slopes: radians per second toward the fall line.
+const BONELESS_MIN_SPEED: float = 400.0 * INCH ## Physics_Boneless_Jump_Speed_min_Stat: a tapped boneless.
+const BONELESS_MAX_SPEED_STAT: Vector2 = Vector2(489.0, 525.0) ## Physics_Boneless_Jump_Speed_Stat: a full hold.
+const VERT_BONELESS_MIN_SPEED: float = 200.0 * INCH ## Physics_Boneless_Air_Jump_Speed_min_Stat: off a vert wall.
+const VERT_BONELESS_MAX_SPEED_STAT: Vector2 = Vector2(264.0, 325.0) ## Physics_Boneless_Air_Jump_Speed_Stat.
+const BONELESS_WINDOW: float = 0.5 ## Jumptricks' TapTwiceRelease: two Up presses then the Ollie release inside this.
+const NO_COMPLY_WINDOW: float = 0.3 ## Jumptricks0's PressAndRelease: an Up press then the Ollie release inside this.
+const TRANSFER_OVERRIDE_START: float = 1.25 ## handle_post_transfer_limit_overrides: a transfer ending faster than this many times the soft cap lifts the caps...
+const TRANSFER_OVERRIDE_MAX: float = 1.75 ## Physics_Transfer_Speed_Limit_Override_Max: ...to the speed over the soft cap, this much at most...
+const TRANSFER_OVERRIDE_DROP_RATE: float = 0.5 ## Physics_Transfer_Speed_Limit_Override_Drop_Rate: ...dropping back by this much of the cap each second on the ground.
+const TRANSFER_OVERRIDE_SLACK: float = 1.1 ## The lifted cap also follows the speed down, at this much of it, so braking ends the override.
+const ACID_DROP_MIN_LAND_SPEED: float = 500.0 * INCH ## Physics_Acid_Drop_Min_Land_Speed: landing an acid drop slower than this is boosted to it.
 const RAIL_MAX_SNAP: float = 40.0 * INCH ## Rail_Max_Snap: how far a rail can be from the board's path and still take it.
 const RAIL_PARALLEL_WEIGHT: float = 0.122 ## rail.cpp:1074: a rail you travel along scores eight times better than one across you.
 const RAIL_REGRIND_TIME: float = 0.5 ## Rail_minimum_rerail_time: after riding off the end.
@@ -153,6 +169,9 @@ const WALLPLANT_VERTICAL_EXIT_SPEED: float = 500.0 * INCH ## Physics_Wallplant_V
 const WALLPLANT_DISTANCE: float = 27.6 * INCH ## Physics_Wallplant_Distance_From_Wall the skater is set off it.
 const WALLPLANT_DURATION: float = 0.16 ## Physics_Wallplant_Duration: frozen on the wall this long.
 const REWALLPLANT_TIME: float = 1.0 ## Physics_Disallow_Rewallplant_Duration.
+const WALLPUSH_SPEED_LOSS: float = 200.0 * INCH ## Physics_Wallpush_Speed_Loss off the reflected speed of a wallpush.
+const WALLPUSH_MIN_EXIT_SPEED: float = 100.0 * INCH ## Physics_Wallpush_Min_Exit_Speed.
+const REWALLPUSH_TIME: float = 0.8 ## Physics_Disallow_Rewallpush_Duration: between wallpushes, and after a wallplant.
 const VERT_FOR_TRANSFERS: float = 0.707 ## A face whose normal's up part is below this is vert to a transfer (45 degrees).
 const TRANSFER_SEARCH_START: float = 10.0 * INCH ## The transfer target search steps over the deck from here...
 const TRANSFER_SEARCH_END: float = 500.0 * INCH ## ...to here...
@@ -254,6 +273,7 @@ var _left_ground_at: float = -10.0
 var _wallplant_timer: float = 0.0 ## Counting down the freeze on the wall.
 var _wallplant_velocity: Vector3 = Vector3.ZERO ## Given back when the freeze ends.
 var _last_wallplant_at: float = -10.0
+var _last_wallpush_at: float = -10.0
 var _pre_lip_position: Vector3 = Vector3.ZERO ## Where the skater was when the lip took them, to drop back in from.
 var _lip_rail: Rail
 var _transferring: bool = false ## Crossing a spine, a hip or an acid drop: the horizontal velocity is the transfer's until the target height.
@@ -261,6 +281,13 @@ var _transfer_target: Vector3 = Vector3.ZERO ## The point on the far face the tr
 var _transfer_normal: Vector3 = Vector3.ZERO ## That face's horizontal normal.
 var _transfer_velocity: Vector3 = Vector3.ZERO
 var _transfer_lip: float = 0.0 ## The height the far face was found at, where its tracking runs from.
+var _transfer_override: float = 1.0 ## How many times the soft cap the speed may be after a transfer (m_transfer_overrides_factor); 1 when the caps stand.
+var _override_max: float = INF ## The lifted soft cap while [member _transfer_override] runs (m_override_max).
+var _acid_dropping: bool = false ## An acid drop is under way: its landing is boosted to [constant ACID_DROP_MIN_LAND_SPEED].
+var _autoturn: bool = false ## Vert air turns the skater to face down the wall unless a spin is held (THUG's AUTOTURN).
+var _autoturn_angle: float = 0.0 ## Radians the autoturn has turned the body about the wall's normal so far.
+var _fall_line: Vector3 = Vector3.ZERO ## Horizontal direction the skater will roll back down the wall (m_fall_line).
+var _balances: Dictionary = {} ## Kind to its [SkateBalance], kept for the length of a combo, as THUG keeps mManual, mGrind, mLip and mSkitch.
 var _clock: float = 0.0 ## Seconds of physics time on the board; see [method _now].
 var _up_since: float = -1.0 ## When Up went down, on the clock; -1 while it is up. Breaking vert wants it held a while.
 
@@ -352,6 +379,12 @@ func mount(_player: Player) -> void:
 	_tense_since = -1.0
 	_bail_timer = 0.0
 	_end_trick(false)
+	_reset_balances()
+	_transfer_override = 1.0
+	_override_max = INF
+	_acid_dropping = false
+	_autoturn = false
+	_autoturn_angle = 0.0
 	if _last_rider_peer != player.get_multiplayer_authority():
 		tricks = SkateTricks.new() # a new rider starts a new run; the same one keeps the score across walking
 	_last_rider_peer = player.get_multiplayer_authority()
@@ -378,6 +411,7 @@ func dismount(_player: Player) -> void:
 			combo_lost.emit()
 		else:
 			combo_banked.emit(tricks.land_clean())
+	_reset_balances()
 	_reset_board()
 	_transferring = false
 	_wallplant_timer = 0.0
@@ -733,6 +767,8 @@ func ride(_player: Player, delta: float) -> void:
 			_bounce_off_wall(player.get_wall_normal())
 		elif player.is_on_wall() and state == State.AIR and _wallplant_timer <= 0.0:
 			_hit_wall_in_air(intended)
+		if state == State.AIR:
+			_pose_autoturn()
 	if balance_meter:
 		balance_meter.visible = balance != null and player.is_multiplayer_authority()
 		if balance:
@@ -753,10 +789,12 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 	var velocity: Vector3 = rotate_to_plane(player.velocity - normal * lift, normal)
 	velocity += gravity.slide(normal) * delta
 
-	# Down is the sharp turn while Left or Right is held at speed, and the brake otherwise (is_trying_to_brake)
+	# Down is the sharp turn while Left or Right is held at speed, and the brake otherwise (is_trying_to_brake);
+	# slow on a steep slope there is no brake, the board slides off it (on_steep_slow_slope)
 	var down: bool = motion.y < 0.0 and balance == null
 	var speed: float = (player.velocity - normal * lift).length()
-	var braking: bool = down and (motion.x == 0.0 or speed < SLOW_SPEED)
+	var steep_and_slow: bool = speed < STEEP_SLOPE_MAX_SPEED and normal.dot(up) < STEEP_SLOPE_COSINE
+	var braking: bool = down and not steep_and_slow and (motion.x == 0.0 or speed < SLOW_SPEED)
 	var forward: Vector3 = player.orientation.basis.z.slide(normal)
 	if forward.length_squared() < 0.001:
 		forward = velocity.slide(normal)
@@ -781,9 +819,27 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 
 	# Rolling backwards turns the skater round (flip_if_skating_backwards)
 	if has_forward and not braking and speed > FLIP_SPEED and velocity.dot(forward) < 0.0:
-		player.orientation.basis = Basis(normal, PI) * player.orientation.basis
+		player.orientation.basis = Basis(up, PI) * player.orientation.basis # about up: the facing is a yaw, and a half turn about a steep normal would tilt it
 		player.model_pitch = -player.model_pitch
 		forward = -forward
+
+	# Slow on a steep slope, and not climbing it, the facing turns to the fall line at a steady rate
+	# (slide_off_slow_steep_slope), so a stall on a transition rolls back down it instead of sitting sideways on
+	# it. THUG turns its matrix about the surface normal; the facing here is a yaw, so the turn is about up toward
+	# the downhill direction, and a climb is left alone so the turn cannot bend a launch sideways
+	if steep_and_slow and has_forward:
+		var fall: Vector3 = (-up).slide(normal)
+		var downhill: Vector3 = fall.slide(up)
+		if downhill.length_squared() > 0.0001 and velocity.dot(fall) >= 0.0:
+			var heading: Vector3 = player.orientation.basis.z.slide(up)
+			if heading.length_squared() > 0.0001:
+				var angle: float = heading.normalized().signed_angle_to(downhill.normalized(), up)
+				var rot: float = clampf(STEEP_SLOPE_TURN_RATE * delta, 0.0, absf(angle)) * signf(angle)
+				player.orientation.basis = Basis(up, rot) * player.orientation.basis
+				forward = player.orientation.basis.z.slide(normal)
+				has_forward = forward.length_squared() > 0.001
+				if has_forward:
+					forward = forward.normalized()
 
 	# Kick, brake, drag: on the speed alone (do_kick, do_brake, the friction block and limit_speed)
 	var kicking: bool = motion.y > 0.0 or player.current_locomotion_node == KICK_PUSH
@@ -794,9 +850,15 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 		if speed < cap:
 			speed = minf(speed + (_stat(CROUCH_KICK_ACCELERATION_STAT) if sprint else _stat(KICK_ACCELERATION_STAT)) * delta, cap)
 	speed -= (CROUCH_WIND_DRAG if sprint else WIND_DRAG) * speed * speed * delta
-	if speed > _stat(MAX_SPEED_STAT):
+	var soft_cap: float = _stat(MAX_SPEED_STAT)
+	var hard_cap: float = _stat(MAX_MAX_SPEED_STAT)
+	var lifted: float = _limit_override(speed, delta)
+	if lifted > 0.0:
+		soft_cap = lifted # after a transfer the caps are lifted for a while (THUG's m_override_max, with no hard cap at all)
+		hard_cap = INF
+	if speed > soft_cap:
 		speed -= HEAVY_DRAG * speed * speed * delta
-	speed = clampf(speed, 0.0, _stat(MAX_MAX_SPEED_STAT))
+	speed = clampf(speed, 0.0, hard_cap)
 
 	# The board never slides: the speed goes along the facing (remove_sideways_velocity)
 	if has_forward:
@@ -813,6 +875,8 @@ func _roll(motion: Vector2, sprint: bool, normal: Vector3, delta: float) -> void
 ## A wall met on the ground: THUG bounce_off_wall. The velocity and the facing are turned to run along the wall,
 ## and the speed drops by how square-on the hit was, to nothing head-on, so the board never grinds along a wall.
 func _bounce_off_wall(wall_normal: Vector3) -> void:
+	if _try_wallpush(wall_normal):
+		return
 	var up: Vector3 = player.up_direction
 	var velocity: Vector3 = player.velocity.slide(up)
 	var speed: float = velocity.length()
@@ -829,6 +893,45 @@ func _bounce_off_wall(wall_normal: Vector3) -> void:
 	player.velocity = along * speed + up * player.velocity.dot(up)
 	player.rotate_model_to_direction(along)
 	player.global_position += wall_normal * 0.02
+
+
+## THUG check_for_wallpush, tried before the bounce: Grind held into a wall squarer than the glance angle, long
+## enough after the last wallpush or wallplant, pushes the skater back off it: the velocity across the wall is
+## reflected, the speed drops by [constant WALLPUSH_SPEED_LOSS] (to [constant WALLPUSH_MIN_EXIT_SPEED] at the
+## least), and the skater faces the way they now roll. In a manual it is THUG's Manual_Wallpush: the manual
+## carries on backwards as the other manual, and the push is in the combo.
+func _try_wallpush(wall_normal: Vector3) -> bool:
+	if not Input.is_action_pressed(_action(keyboard_grind_action, pad_grind_action)) or _bail_timer > 0.0:
+		return false
+	var now: float = _now()
+	if now - _last_wallpush_at < REWALLPUSH_TIME or now - _last_wallplant_at < REWALLPUSH_TIME:
+		return false
+	var up: Vector3 = player.up_direction
+	var normal: Vector3 = wall_normal.slide(up)
+	if normal.length_squared() < 0.0001:
+		return false
+	normal = normal.normalized()
+	var forward: Vector3 = player.orientation.basis.z.slide(up)
+	if forward.length_squared() < 0.0001 or forward.normalized().dot(normal) >= -sin(WALL_BOUNCE_DONT_SLOW_ANGLE - deg_to_rad(1.0)):
+		return false
+	var velocity: Vector3 = player.velocity - 2.0 * player.velocity.dot(normal) * normal
+	var speed: float = velocity.length()
+	if speed > 0.001:
+		velocity *= maxf(WALLPUSH_MIN_EXIT_SPEED, speed - WALLPUSH_SPEED_LOSS) / speed
+	else:
+		velocity = -forward.normalized() * WALLPUSH_MIN_EXIT_SPEED
+	var floor_normal: Vector3 = player.get_floor_normal() if player.is_on_floor() else up
+	player.velocity = rotate_to_plane(velocity, floor_normal)
+	player.rotate_model_to_direction(player.velocity.slide(up))
+	player.global_position += normal * 0.02
+	_last_wallpush_at = now
+	if balance and SkateTricks.MANUALS.has(trick):
+		var other: String = "nose_manual" if trick == "manual" else "manual"
+		_end_trick(false)
+		tricks.add(SkateTricks.WALLPUSH[0], SkateTricks.WALLPUSH[1])
+		_start_trick(other) # a manual pushed off a wall is a nose manual back out, and the other way round
+		player.model_pitch = -player.model_pitch
+	return true
 
 
 ## Pops the board. [param held] seconds on the button make the pop linear between the tap and the full hold (THUG
@@ -863,7 +966,13 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 		vert_normal = Vector3.ZERO
 		return
 	var from_vert: bool = player.is_on_floor() and vert_launch_direction(player.get_floor_normal(), up) != Vector3.ZERO
-	var pop: float = lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge) if from_vert else lerpf(OLLIE_MIN_SPEED, _stat(OLLIE_MAX_SPEED_STAT), charge)
+	var jump_trick: Array = _jump_trick()
+	var pop: float
+	if jump_trick == SkateTricks.BONELESS:
+		# Jump BonelessHeight: the foot plant pops higher, off vert too
+		pop = lerpf(VERT_BONELESS_MIN_SPEED, _stat(VERT_BONELESS_MAX_SPEED_STAT), charge) if from_vert else lerpf(BONELESS_MIN_SPEED, _stat(BONELESS_MAX_SPEED_STAT), charge)
+	else:
+		pop = lerpf(VERT_OLLIE_MIN_SPEED, VERT_OLLIE_MAX_SPEED, charge) if from_vert else lerpf(OLLIE_MIN_SPEED, _stat(OLLIE_MAX_SPEED_STAT), charge)
 	_end_trick(false)
 	_play_board("ollie")
 	player.velocity += up * (pop - minf(player.velocity.dot(up), 0.0))
@@ -873,6 +982,29 @@ func _ollie(held: float = MAX_TENSE_TIME) -> void:
 		_was_on_floor = false
 		state = State.AIR
 		_launch(up)
+	if not jump_trick.is_empty():
+		tricks.add(jump_trick[0], jump_trick[1])
+		_bank_timer = 0.0
+		_air_tricks = 1 # the spin this air lands with reads "FS 360 Boneless"
+		_taps.clear() # the taps are spent (THUG marks the events used)
+
+
+## The trick a pop from the ground is, from the Up taps before it (THUG's Jumptricks, matched on the Ollie release):
+## two inside [constant BONELESS_WINDOW] are a Boneless, one inside [constant NO_COMPLY_WINDOW] a No Comply, as
+## [name, points]; empty for a plain ollie.
+func _jump_trick() -> Array:
+	if state != State.GROUND or not player.is_on_floor():
+		return []
+	var now: float = _now()
+	var ups: int = 0
+	for tap: Array in _taps:
+		if tap[0] == "up" and now - float(tap[1]) <= BONELESS_WINDOW:
+			ups += 1
+	if ups >= 2:
+		return SkateTricks.BONELESS
+	if not _taps.is_empty() and _taps.back()[0] == "up" and now - float(_taps.back()[1]) <= NO_COMPLY_WINDOW:
+		return SkateTricks.NO_COMPLY
+	return []
 
 
 ## Airborne: THUG do_in_air_physics. With Grind held a rail is looked for along this tick's move; Left and Right
@@ -894,15 +1026,22 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 			_try_spine()
 		elif vert_normal == Vector3.ZERO:
 			_try_acid_drop()
+	var spun: bool = false
 	if motion.x != 0.0:
 		_air_spin_hold += delta
+		if _air_spin_hold > AUTOTURN_CANCEL_TIME:
+			_autoturn = false # held past a tap: the turning is the player's for the rest of this air
+			_autoturn_angle = 0.0
 		var ramp: float = clampf((_air_spin_hold - AIR_NO_ROTATE_TIME) / (AIR_RAMP_ROTATE_TIME - AIR_NO_ROTATE_TIME), 0.0, 1.0)
 		if ramp > 0.0:
 			var turn: float = -motion.x * _stat(AIR_SPIN_SPEED_STAT, 1.0) * ramp * delta
 			player.orientation.basis = Basis(up, turn) * player.orientation.basis
 			_spin_tally += rad_to_deg(turn)
+			spun = true
 	else:
 		_air_spin_hold = 0.0
+	if not spun and _autoturn and vert_normal != Vector3.ZERO and not _transferring:
+		_autoturn_toward_fall_line(up, delta)
 	var gravity: Vector3 = -up * AIR_GRAVITY
 	if _transferring:
 		if player.velocity.dot(up) < 0.0 and player.global_position.dot(up) < _transfer_target.dot(up):
@@ -920,6 +1059,40 @@ func _fly(motion: Vector2, grind_held: bool, up: Vector3, delta: float) -> void:
 		player.velocity = player.velocity.slide(vert_normal) + gravity / VERT_HANG * delta
 	else:
 		player.velocity += gravity / AIR_HANG * delta
+
+
+## Vert air with no spin held (THUG's AUTOTURN in handle_air_rotation): the skater turns toward the fall line, the
+## way they will roll back down the wall, at [constant AUTOTURN_SPEED], so they come down facing it rather than
+## being turned round on touchdown. The spin tally is left alone: THUG counts only the player's own turning. As
+## in THUG the body turns about the wall's normal, its up kept on the wall: [member _autoturn_angle] is how far
+## it has gone, [method _pose_autoturn] draws it, and when the turn is done the facing is set to the fall line
+## and the lean flipped with it, which is the same pose, so nothing jumps.
+func _autoturn_toward_fall_line(up: Vector3, delta: float) -> void:
+	var facing: Vector3 = player.orientation.basis.z.slide(up)
+	if facing.length_squared() < 0.0001 or _fall_line == Vector3.ZERO:
+		_autoturn = false
+		return
+	var angle: float = facing.normalized().signed_angle_to(_fall_line, up)
+	if absf(angle) < 0.001:
+		_autoturn = false
+		return
+	_autoturn_angle += AUTOTURN_SPEED * delta
+	if _autoturn_angle < absf(angle):
+		return
+	_autoturn = false
+	_autoturn_angle = 0.0
+	player.orientation.basis = Basis(up, angle) * player.orientation.basis
+	player.model_pitch = -player.model_pitch
+
+
+## Draws the autoturn: the model, leaning on the wall, is turned about the wall's normal by how far the turn has
+## gone, the way THUG's matrix turns about its Y in vert air.
+func _pose_autoturn() -> void:
+	if _autoturn_angle <= 0.0 or vert_normal == Vector3.ZERO:
+		return
+	var facing: Vector3 = player.orientation.basis.z.slide(player.up_direction)
+	var side: float = signf(facing.signed_angle_to(_fall_line, player.up_direction)) if facing.length_squared() > 0.0001 else 1.0
+	player.player_model.global_transform.basis = Basis(vert_normal, _autoturn_angle * side) * player.player_model.global_transform.basis
 
 
 ## Whether the wall the skater launched from is still behind them at the launch height (THUG's tracking feeler).
@@ -962,6 +1135,15 @@ func _launch(up: Vector3) -> void:
 	player.global_position += vert_normal * VERT_PUSH_OUT
 	_vert_point = player.global_position
 	player.velocity = vert_launch_velocity(player.velocity, vert_normal)
+	# The fall line is the facing with its part toward the deck turned back into the pipe (THUG negates the climb);
+	# with nothing held the air turns the skater to it
+	var facing: Vector3 = player.orientation.basis.z.slide(up)
+	if facing.length_squared() < 0.0001:
+		facing = out
+	facing = facing.normalized()
+	_fall_line = (facing - 2.0 * facing.dot(out) * out).normalized()
+	_autoturn = true
+	_autoturn_angle = 0.0
 
 
 ## Touching down: face the way the board is rolling, whatever the spin left the skater at (THUG flips a skater
@@ -973,7 +1155,15 @@ func _land(normal: Vector3) -> void:
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
 	_transferring = false
+	_autoturn = false
+	_autoturn_angle = 0.0
 	_air_spin_hold = 0.0
+	if _acid_dropping:
+		# Landing an acid drop slow is boosted (Physics_Acid_Drop_Min_Land_Speed), so a drop in never stalls on the wall
+		_acid_dropping = false
+		var landed: Vector3 = player.velocity.slide(normal)
+		if landed.length() > 0.001 and landed.length() < ACID_DROP_MIN_LAND_SPEED:
+			player.velocity = landed.normalized() * ACID_DROP_MIN_LAND_SPEED + normal * player.velocity.dot(normal)
 	_settle_landing(from_vert)
 	var rolling: Vector3 = player.velocity.slide(normal)
 	if rolling.length() > 1.0:
@@ -1051,6 +1241,7 @@ func _got_rail(on: Rail, hit: Dictionary, across: bool = false) -> void:
 	_was_on_floor = false
 	_air_time = 0.0
 	_transferring = false
+	_acid_dropping = false
 	_reset_board()
 	air_trick = ""
 	player.global_position = hit["point"]
@@ -1129,6 +1320,7 @@ func _try_lip() -> bool:
 	_was_on_floor = false
 	_air_time = 0.0
 	_transferring = false
+	_acid_dropping = false
 	_reset_board()
 	air_trick = ""
 	_spin_tally = 0.0
@@ -1225,6 +1417,7 @@ func _try_wallplant(collision: KinematicCollision3D, normal: Vector3, intended: 
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
 	_transferring = false
+	_acid_dropping = false
 	tricks.add(SkateTricks.WALLPLANT[0], SkateTricks.WALLPLANT[1])
 	_bank_timer = 0.0
 	return true
@@ -1252,6 +1445,7 @@ func _try_wallride(collision: KinematicCollision3D, normal: Vector3, intended: V
 	state = State.WALL
 	_was_on_floor = false
 	_transferring = false
+	_acid_dropping = false
 	vert_out = Vector3.ZERO
 	vert_normal = Vector3.ZERO
 	_reset_board()
@@ -1449,6 +1643,7 @@ func _try_acid_drop() -> bool:
 	vert_normal = target_normal # vert air from here, for the camera; tracking starts at the lip
 	vert_out = -vert_normal
 	_spin_tally = 0.0
+	_acid_dropping = true
 	tricks.add(SkateTricks.ACID_DROP[0], SkateTricks.ACID_DROP[1])
 	return true
 
@@ -1459,6 +1654,7 @@ func _try_acid_drop() -> bool:
 func _enter_transfer(target: Vector3, normal: Vector3, velocity: Vector3, lip: float) -> void:
 	var up: Vector3 = player.up_direction
 	_transferring = true
+	_autoturn = false
 	_transfer_target = target
 	_transfer_lip = lip
 	_transfer_normal = normal.slide(up).normalized()
@@ -1474,8 +1670,38 @@ func _finish_transfer() -> void:
 	vert_normal = _transfer_normal
 	vert_out = -vert_normal
 	_vert_point = _transfer_target + vert_normal * VERT_PUSH_OUT + up * (_transfer_lip - _transfer_target.dot(up))
+	_begin_transfer_override(player.velocity.length())
 	player.velocity = up * player.velocity.dot(up)
 	player.rotate_model_to_direction(vert_normal)
+
+
+## THUG handle_post_transfer_limit_overrides, at the end of a transfer: leaving it faster than
+## [constant TRANSFER_OVERRIDE_START] times the soft cap lifts both caps, the soft one to the speed over the cap
+## ([constant TRANSFER_OVERRIDE_MAX] at most), so a big drop keeps its speed; [method _limit_override] brings it down.
+func _begin_transfer_override(speed: float) -> void:
+	var standard_max: float = _stat(MAX_SPEED_STAT)
+	if speed < TRANSFER_OVERRIDE_START * standard_max:
+		return
+	_transfer_override = minf(speed / standard_max, TRANSFER_OVERRIDE_MAX)
+	_override_max = INF
+
+
+## The lifted soft cap for this ground tick at [param speed], or -1 while the caps stand: the override drops by
+## [constant TRANSFER_OVERRIDE_DROP_RATE] of the cap a second on the ground only (air time does not count), never
+## rises, follows the speed down at [constant TRANSFER_OVERRIDE_SLACK] of it so a brake ends it, and ends once it
+## is back under the cap.
+func _limit_override(speed: float, delta: float) -> float:
+	if _transfer_override <= 1.0:
+		return -1.0
+	var standard_max: float = _stat(MAX_SPEED_STAT)
+	_transfer_override -= TRANSFER_OVERRIDE_DROP_RATE * delta
+	var allowed: float = minf(minf(_transfer_override * standard_max, TRANSFER_OVERRIDE_SLACK * speed), _override_max)
+	if _transfer_override < 1.0 or allowed < standard_max:
+		_transfer_override = 1.0
+		_override_max = INF
+		return -1.0
+	_override_max = allowed
+	return allowed
 
 
 # --- Skitching ----------------------------------------------------------------------------------------------------
@@ -1553,8 +1779,8 @@ func _skitch_out() -> void:
 # --- Balance tricks -----------------------------------------------------------------------------------------------
 
 func _start_trick(kind: String) -> void:
-	balance = SkateBalance.new()
-	balance.setup(kind)
+	balance = _balance_for(kind)
+	balance.setup(kind, rail.get_instance_id() if rail else -1)
 	trick = kind
 	if SkateTricks.MANUALS.has(kind):
 		var manual: Array = SkateTricks.MANUALS[kind]
@@ -1572,11 +1798,29 @@ func _end_trick(bailed: bool) -> void:
 	trick_ended.emit(kind, bailed)
 
 
+## The balance behind [param kind] for this combo: one per kind, as THUG keeps one CManual each for manuals (a
+## nose manual shares it), grinds, lips and skitches, so the next trick of the kind carries on from the last.
+func _balance_for(kind: String) -> SkateBalance:
+	var key: String = "manual" if SkateTricks.MANUALS.has(kind) else kind
+	if not _balances.has(key):
+		_balances[key] = SkateBalance.new()
+	return _balances[key]
+
+
+## The combo is over (banked or bailed): every kind's balance starts the next one fresh (THUG's Reset on
+## clearpanel_landed and clearpanel_bailed).
+func _reset_balances() -> void:
+	for kept: SkateBalance in _balances.values():
+		kept.reset()
+
+
 ## The needle went off the meter: the trick is over, most of the speed is gone, and the rider is a passenger for
 ## [constant BAIL_TIME] (THUG's bail is an animation over the same physics; there is no ragdoll here yet).
 func _bail() -> void:
 	_end_trick(true)
+	_reset_balances()
 	air_trick = ""
+	_acid_dropping = false
 	tricks.bail()
 	combo_lost.emit()
 	if state == State.LIP:
@@ -1656,6 +1900,7 @@ func _tick_tricks(delta: float) -> void:
 		_bank_timer -= delta
 		if _bank_timer <= 0.0 and balance == null and state == State.GROUND and not tricks.combo.is_empty():
 			combo_banked.emit(tricks.land_clean())
+			_reset_balances()
 
 
 ## A landing: a flip still turning is a bail, a spin far from a half turn is a bail, otherwise the spin is counted,

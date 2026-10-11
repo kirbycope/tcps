@@ -7,7 +7,7 @@ extends Path3D
 ## corner sharper than [member leave_angle_degrees].
 
 @export var speed_boost: float = 3.81 ## Rail_Speed_Boost, THUG's 150 in/s: metres per second added on locking on, so a grind never stalls at the start.
-@export_range(0.0, 180.0) var leave_angle_degrees: float = 60.0 ## Rail_Corner_Leave_Angle: a bend sharper than this is the end of the rail.
+@export_range(0.0, 180.0) var leave_angle_degrees: float = 50.0 ## Rail_Corner_Leave_Angle: a bend sharper than this is the end of the rail.
 
 
 func _ready() -> void:
